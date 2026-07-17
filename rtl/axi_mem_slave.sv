@@ -1,4 +1,5 @@
-// Code your design here
+`timescale 1ns / 1ps
+
 module axi_mem_slave(
     input clk,
     input resetn,
@@ -95,7 +96,7 @@ module axi_mem_slave(
 // 2. FSM for write data channel
 
   reg [31:0] wdata_temp;
-  reg [7:0] mem[128] = '{default:12};
+  reg [7:0] mem[128] = '{default:0};
   reg [31:0] return_addr;
   reg [31:0] next_addr;
   reg first; // indicate if the it this the first transaction of the transfer => addr = awaddr
@@ -193,7 +194,8 @@ module axi_mem_slave(
   function bit[31:0] data_wr_incr (input [3:0] wstrb, input [31:0] awaddr_temp);
       
       bit [31:0] addr; // return the address for the next transaction 
-  
+        //$display("DUT WRITE INCR: addr=%0d wstrb=%b wdata=%0h", 
+          //awaddr_temp, wstrb, wdata_temp);
       unique case (wstrb)
       4'b0001: begin 
           mem[awaddr_temp] = wdata_temp[7:0];
@@ -700,33 +702,34 @@ module axi_mem_slave(
       end  
       
       wreadys: begin
-          
-        if (wlast == 1'b1) begin
-          wnext_state = widle;
-          wready = 1'b0;
-          wlen_count = 0;
-          first = 0; 
-        end else if(wlen_count < (awlen + 1)) begin
-          wnext_state = wvalids;
-          wready      = 1'b1;
+        wready = 1'b1;
+
+        if (wvalid) begin
+            case (awburst)
+                2'b00: begin
+                    return_addr = data_wr_fixed(wstrb, awaddr);
+                end
+
+                2'b01: begin
+                    return_addr = data_wr_incr(wstrb, next_addr);
+                end
+
+                2'b10: begin
+                    boundary = wrap_boundary(awlen, awsize);
+                    return_addr = data_wr_wrap(wstrb, next_addr, boundary);
+                end
+            endcase
+
+            if (wlast == 1'b1) begin
+                wnext_state = widle;
+                wlen_count  = 0;
+                first       = 0;
+            end else begin
+                wnext_state = wvalids;
+            end
         end else begin
-          wnext_state = wreadys;
-        end 
-        
-        case (awburst)
-          2'b00: begin  // fix mode address burst      
-            return_addr = data_wr_fixed(wstrb, awaddr);  ///fixed
-          end
-          
-          2'b01: begin // increment address mode   
-            return_addr =  data_wr_incr(wstrb,next_addr); 
-          end
-                                                      
-          2'b10: begin
-            boundary = wrap_boundary(awlen, awsize);   /////calculate wrapping boundary
-            return_addr = data_wr_wrap(wstrb, next_addr, boundary); ///////generate next addr
-          end     
-        endcase    
+            wnext_state = wreadys;
+        end
       end
           
           
@@ -1141,7 +1144,5 @@ interface axi_if();
   logic clk;
   logic resetn;
  
-  logic [31:0] next_addrwr;
-  logic [31:0] next_addrrd;
-  
-endinterface 
+endinterface // Code your design here
+
