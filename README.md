@@ -1,12 +1,12 @@
 # AXI RAM UVM Verification
 
-A reusable SystemVerilog UVM verification environment for an AXI4-compliant RAM slave featuring directed and constrained-random verification, automated scoreboarding, protocol-aware monitoring, and burst transaction verification.
+A reusable SystemVerilog UVM verification environment for a simplified AXI memory slave featuring directed and constrained-random verification, automated scoreboarding, burst transaction verification, and a growing suite of SystemVerilog Assertions (SVA) for cycle-level protocol checking.
 
 ---
 
 # Overview
 
-This project presents a **SystemVerilog UVM (Universal Verification Methodology)** environment developed to functionally verify a custom **AXI4 RAM slave** supporting multiple burst types, transfer sizes, and error handling.
+This project presents a **SystemVerilog UVM (Universal Verification Methodology)** environment developed to functionally verify a custom **AXI RAM slave** supporting multiple burst types, transfer sizes, and error handling. A separate passive **SystemVerilog Assertions (SVA)** checker complements the UVM environment with cycle-level checks. The implementation is simplified; full AXI protocol compliance has not been established.
 
 The Design Under Test (DUT) implements a **128-byte memory** accessed through a simplified AXI4 interface. The verification environment generates both directed and constrained-random transactions, monitors all AXI channels, and automatically validates DUT functionality using a golden reference-memory scoreboard.
 
@@ -20,28 +20,30 @@ Unlike simpler bus protocols such as APB, AXI introduces independent address, da
 | **Memory** | 128 × 8-bit |
 | **Burst Types** | FIXED, INCR, WRAP |
 | **Transfer Sizes** | 1-byte, 2-byte, 4-byte |
-| **Verification Style** | Directed Testing, Constrained-Random, Self-checking Scoreboard |
+| **Verification Style** | Directed Testing, Constrained-Random, Self-checking Scoreboard, SystemVerilog Assertions |
 
 ---
 
 # Project Structure
 
 ```text
-AXI_RAM/
+axi-slave-uvm/
 │
 ├── docs/
 │   ├── verification_plan.md
 │   └── images/
-│       ├── AXI_architecture.png
-│       ├── TB_Architecture.png
-│       ├── AXI_write_read_waveform.png
-│       └── AXI_burst_waveform.png
+│       ├── AXI_slave_architecture.png
+│       ├── TB_Architecture_2.png
+│       └── AXI_write_read_waveform.png
 │
 ├── rtl/
-│   └── AXI_RAM.sv
+│   └── axi_mem_slave.sv
 │
 ├── tb/
-│   └── AXI_uvm_tb.sv
+│   ├── AXI_MEM_tb.sv
+│   └── assertions/
+│       ├── axi_sva.sv
+│       └── axi_sva_bind.sv
 │
 └── README.md
 ```
@@ -65,6 +67,14 @@ The slave accepts AXI read and write requests through independent address channe
 ---
 
 # Supported Features
+
+### Assertion-Based Verification
+
+- Separate passive checker module, `axi_sva`, in `tb/assertions/axi_sva.sv`
+- SystemVerilog `bind` integration through `tb/assertions/axi_sva_bind.sv`
+- Seven initial assertions for stalled-transfer stability and reset VALID behavior
+- Cycle-level protocol checks that complement UVM functional/data checking
+- Ongoing assertion development and protocol debugging; complete protocol coverage is not claimed
 
 ### Write Channel
 
@@ -163,9 +173,42 @@ The verification environment follows a standard reusable UVM architecture, separ
 | **Driver** | Converts transactions into pin-level AXI bus activity while respecting AXI VALID/READY handshakes. |
 | **Monitor** | Passively reconstructs completed AXI transactions from the DUT interface. |
 | **Scoreboard** | Maintains a golden reference memory and automatically compares expected and actual read data. |
+| **SVA Checker** | Passively checks channel VALID/payload stability and reset VALID behavior at clock edges. Bound to the DUT independently of the UVM component hierarchy. |
 | **Agent** | Groups the driver, monitor, and sequencer into a reusable verification component. |
 | **Environment** | Instantiates and connects the AXI agent and scoreboard. |
 | **Test** | Executes verification sequences and configures simulation behavior. |
+
+---
+
+# SystemVerilog Assertions (SVA)
+
+The initial assertion suite is implemented in [tb/assertions/axi_sva.sv](tb/assertions/axi_sva.sv) as a separate **passive checker module**. It observes the DUT's existing signals and does not drive or force them.
+
+[tb/assertions/axi_sva_bind.sv](tb/assertions/axi_sva_bind.sv) uses SystemVerilog **`bind`** to attach one `axi_sva` checker to each `axi_mem_slave` instance. Assertion instrumentation therefore requires no checker instances or assertion logic inside the DUT RTL. The checker uses the actual signal names and widths implemented by this project.
+
+## Initial Assertion Suite
+
+| Assertion | Behavior Checked | Signal Owner |
+|-----------|------------------|--------------|
+| `aw_hold_when_stalled` | AWVALID remains asserted and AW address, ID, length, size, and burst remain stable under backpressure. | Master / UVM driver |
+| `w_hold_when_stalled` | WVALID remains asserted and write data, strobes, WLAST, and the project's WID remain stable under backpressure. | Master / UVM driver |
+| `b_hold_when_stalled` | BVALID remains asserted and BRESP/BID remain stable under backpressure. | DUT / slave |
+| `ar_hold_when_stalled` | ARVALID remains asserted and AR address, ID, length, size, and burst remain stable under backpressure. | Master / UVM driver |
+| `r_hold_when_stalled` | RVALID remains asserted and RDATA, RRESP, RLAST, and RID remain stable under backpressure. | DUT / slave |
+| `master_valids_low_in_reset` | AWVALID, WVALID, and ARVALID are known low during sampled active-low reset. | Master / UVM driver |
+| `slave_valids_low_in_reset` | BVALID and RVALID are known low during sampled active-low reset. | DUT / slave |
+
+All seven properties sample on the positive edge of `clk`. The five stalled-transfer properties use non-overlapping implication (`|=>`) and `$stable()` to check the next sampled edge, including an edge where READY becomes high. They are disabled during active-low reset. The two reset properties remain active during reset and check sampled VALID levels; they do not check immediate asynchronous reset propagation or RAM clearing.
+
+## Relationship to the UVM Scoreboard
+
+The **UVM scoreboard performs functional/data checking**, maintaining a reference memory and comparing observed read data against expected values. **SVA provides cycle-level protocol checking**, observing signal persistence and reset behavior directly at the DUT boundary. These checks are complementary: a data comparison can agree even when channel timing violates a protocol requirement.
+
+The initial suite checks WLAST/RLAST stability during stalls, but does not yet check burst length, final-beat placement, or cross-channel transaction ordering. A quiet assertion log also does not prove that every check was exercised. In particular, the existing driver does not deliberately create B/R response stalls, so those backpressure checks may pass vacuously.
+
+## Simulation Integration
+
+Compile `rtl/axi_mem_slave.sv`, `tb/assertions/axi_sva.sv`, `tb/assertions/axi_sva_bind.sv`, and the existing UVM testbench `tb/AXI_MEM_tb.sv` in the simulator's source set, with UVM enabled. Compile each source once and elaborate the existing `tb` top. The bind file attaches the checker without changes to the UVM component connections.
 
 ---
 
@@ -193,7 +236,7 @@ Unlike APB, these channels are independent and synchronize only through the AXI 
 
 # Verification Strategy
 
-The verification environment combines **directed testing** with **constrained-random verification** to validate both protocol behavior and memory functionality.
+The verification environment combines **directed testing**, **constrained-random verification**, and **SystemVerilog Assertions** to investigate memory functionality and selected protocol requirements.
 
 Each transaction generated by the sequences is driven onto the AXI interface, reconstructed by the monitor, and automatically checked by the scoreboard.
 
@@ -203,6 +246,7 @@ The verification strategy includes:
 - Constrained-random transaction generation
 - Burst transaction verification
 - Automatic reference-memory checking
+- Cycle-level VALID/payload stability and reset checks using a bound SVA checker
 - Error-response verification
 - Corner-case validation
 
@@ -336,6 +380,12 @@ The implemented verification sequences exercise:
 - Constrained-random regression testing
 
 # Verification Results
+
+## Initial SVA Simulation Results
+
+Initial simulation in **Questa** successfully compiled and exercised the bound `axi_sva` checker. During existing regression testing, an **AR-channel assertion violation** was observed. This demonstrates that cycle-level assertions can expose protocol behavior that is not necessarily detected by the functional memory scoreboard.
+
+The AR violation remains under investigation; an assertion report alone does not establish its root cause. The SVA extension is ongoing work, and these initial results do **not** establish that all seven assertions or the complete regression pass. The functional results below should not be interpreted as assertion pass results.
 
 The verification environment successfully exercised the major functional behaviors of the AXI RAM slave, including basic read/write operations, burst transactions, transfer-size variations, invalid transactions, boundary cases, and constrained-random traffic.
 
@@ -727,10 +777,11 @@ Potential improvements to the verification environment include:
 
 - Functional coverage collection
 - Coverage-driven constrained-random verification
-- SystemVerilog Assertions for AXI protocol handshakes
+- Debugging observed protocol assertion violations, including the AR-channel failure
+- Expanding the initial seven SVA checks with additional burst and cross-channel assertions
 - Assertions for burst length and `RLAST`/`WLAST` behavior
-- Assertions for stable signals while `VALID` is asserted
-- Randomized backpressure using `READY`
+- Assertion coverage and `cover property` goals to establish that checks are exercised
+- Deliberate and randomized backpressure using `READY`, particularly on B and R
 - Additional reset assertions
 - Support for multiple outstanding AXI transactions
 - Functional use of AXI transaction IDs
@@ -748,6 +799,8 @@ Potential improvements to the verification environment include:
 
 - SystemVerilog
 - Universal Verification Methodology (UVM 1.2)
+- SystemVerilog Assertions (SVA) and SystemVerilog `bind`
+- Questa Simulator (initial bound-checker compilation and simulation)
 - AMD Xilinx Vivado Simulator
 - VS Code
 - Git

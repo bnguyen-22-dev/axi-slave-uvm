@@ -50,6 +50,8 @@ module axi_mem_slave(
 // 1. FSM for write address channel
   typedef enum bit [1:0] {awidle = 2'b00, awstart = 2'b01, awreadys = 2'b10} awstate_type;
   awstate_type awstate, awnext_state;
+  typedef enum bit [2:0] {widle = 0, wstart = 1, wreadys = 2, wvalids = 3, waddr_dec = 4} wstate_type;
+  wstate_type wstate, wnext_state;
   
   reg [31:0] awaddr_temp;
   
@@ -653,9 +655,6 @@ module axi_mem_slave(
   
   
   // state type for write data channel fsm
-  typedef enum bit [2:0] {widle = 0, wstart = 1, wreadys = 2, wvalids = 3, waddr_dec = 4} wstate_type;
-  wstate_type wstate, wnext_state;
-
   // sequential current state logic
   always_ff @(posedge clk or negedge resetn) begin
     if (!resetn) begin
@@ -803,6 +802,8 @@ module axi_mem_slave(
   end
 
   // 4. FSM for read adress
+  typedef enum bit [1:0] {aridle = 0, arstart = 1, arreadys = 2} arstate_type;
+  arstate_type arstate, arnext_state;
   always_ff @(posedge clk, negedge resetn) begin
     if (!resetn) begin
       arstate <= aridle;
@@ -812,10 +813,7 @@ module axi_mem_slave(
  end
  
  
-  typedef enum bit [1:0] {aridle = 0, arstart = 1, arreadys = 2} arstate_type;
-  arstate_type arstate, arnext_state;
- 
-  reg [31:0] araddrt; 
+  reg [31:0] araddrt;
  
   always_comb begin 
     case (arstate)
