@@ -6,17 +6,19 @@ A reusable SystemVerilog UVM verification environment for a simplified AXI memor
 
 # Overview
 
-This project presents a **SystemVerilog UVM (Universal Verification Methodology)** environment developed to functionally verify a custom **AXI RAM slave** supporting multiple burst types, transfer sizes, and error handling. A separate passive **SystemVerilog Assertions (SVA)** checker complements the UVM environment with cycle-level checks. The implementation is simplified; full AXI protocol compliance has not been established.
+This project presents a **SystemVerilog UVM (Universal Verification Methodology)** environment developed to functionally verify a custom **simplified AXI memory slave** supporting multiple burst types, transfer sizes, partial writes, and error handling. A separate passive **SystemVerilog Assertions (SVA)** checker complements the UVM environment with cycle-level checks.
 
-The Design Under Test (DUT) implements a **128-byte memory** accessed through a simplified AXI4 interface. The verification environment generates both directed and constrained-random transactions, monitors all AXI channels, and automatically validates DUT functionality using a golden reference-memory scoreboard.
+The Design Under Test (DUT) is an **educational AXI-inspired implementation** with a **128-byte memory** and five channel interfaces corresponding to AW, W, B, AR, and R. It implements selected AXI features, including FIXED, INCR, and WRAP burst modes, but simplifies several aspects of channel handshaking, transaction coordination, and burst processing. Therefore, this project does **not claim full AXI4 protocol compliance**.
 
-Unlike simpler bus protocols such as APB, AXI introduces independent address, data, and response channels together with burst transactions. Consequently, the primary goal of this project was not only to build a reusable UVM environment, but also to gain practical experience verifying a multi-channel protocol while debugging protocol timing, burst addressing, and transaction synchronization.
+The primary focus of this project is **Design Verification**: building a reusable UVM environment, developing directed and constrained-random stimulus, implementing a self-checking reference-memory scoreboard, adding assertion-based checks, and debugging interactions between the DUT and verification environment.
+
+A detailed description of the implemented RTL behavior, architecture, and known limitations is available in [`docs/RTL_DESIGN_ANALYSIS.md`](docs/RTL_DESIGN_ANALYSIS.md).
 
 | Attribute | Value |
 |-----------|-------|
 | **Language** | SystemVerilog |
 | **Methodology** | UVM 1.2 |
-| **Protocol** | AXI4 |
+| **Protocol Model** | Simplified AXI |
 | **Memory** | 128 × 8-bit |
 | **Burst Types** | FIXED, INCR, WRAP |
 | **Transfer Sizes** | 1-byte, 2-byte, 4-byte |
@@ -52,7 +54,15 @@ axi-slave-uvm/
 
 # Design Overview
 
-The DUT implements a simplified AXI4 memory slave supporting burst-based read and write transactions.
+# Design Overview
+
+The DUT implements a **simplified AXI memory slave** supporting burst-based read and write transactions.
+
+The design contains five channel interfaces corresponding to the AXI write address (AW), write data (W), write response (B), read address (AR), and read data (R) channels. Separate finite-state machines coordinate these channels and access an internal **128-byte byte-addressable memory**.
+
+The DUT supports FIXED, INCR, and WRAP burst modes, 1-byte, 2-byte, and 4-byte transfer sizes, partial writes using `WSTRB`, and basic error-response generation.
+
+The RTL is intentionally treated as an **educational verification target rather than a production AXI4 implementation**. See [`docs/RTL_DESIGN_ANALYSIS.md`](docs/RTL_DESIGN_ANALYSIS.md) for the implemented behavior and design limitations.
 
 <p align="center">
     <img src="docs/images/AXI_slave_architecture.png" width="900">
@@ -61,9 +71,6 @@ The DUT implements a simplified AXI4 memory slave supporting burst-based read an
 <p align="center">
 <b>Figure 1.</b> AXI RAM RTL Architecture.
 </p>
-
-The slave accepts AXI read and write requests through independent address channels, performs memory accesses, and returns write responses or read data through the corresponding response channels. The memory is organized as a **128-byte storage array**, allowing byte, half-word, and word transfers using AXI burst transactions.
-
 ---
 
 # Supported Features
@@ -126,7 +133,7 @@ The DUT implements the five independent AXI channels shown below.
 | **AR** | Read address |
 | **R** | Read data |
 
-Each channel follows the standard **VALID/READY handshake protocol**, allowing address, data, and response transfers to occur independently.
+The DUT exposes the five channel interfaces and associated `VALID`/`READY` signals of an AXI-style interface. Channel behavior is controlled by separate FSMs; however, the current RTL uses simplified channel coordination and handshake sequencing. The exact implemented timing and cross-channel dependencies are documented in [`docs/RTL_DESIGN_ANALYSIS.md`](docs/RTL_DESIGN_ANALYSIS.md).
 
 ---
 

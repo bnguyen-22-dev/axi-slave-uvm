@@ -87,11 +87,14 @@ module axi_mem_slave(
       awreadys: begin
         awready = 1'b1;
         if (wstate == wreadys) begin // wait until the system finish updating the memory
+        // wready = 1 means the slave finish updating the memory => current transaction is complete 
+        //=> awready return to 0 and wait for the next transaction
+        // if wready is not = 1 yet => stay in the current state
             awnext_state  = awidle;
         end else begin
             awnext_state =  awreadys;
         end
-    end  
+      end  
      endcase
     end
 
@@ -297,6 +300,8 @@ module axi_mem_slave(
   
   // compute wrap_coundary for wrap burst type
   // wrap only available for awlen = 1, 3, 7, 15
+  // boundary of a transfer = number of transactions/transfer * number of bytes/transaction
+  // number of transaction/transfer = awlen + 1
   function bit [7:0] wrap_boundary (input bit [3:0] awlen, input bit[2:0] awsize);
     bit [7:0] boundary;
   
@@ -684,7 +689,7 @@ module axi_mem_slave(
         end 
       end
       
-      waddr_dec: begin // this state purpose is to determine (decode) which is the next address for trh transaction
+      waddr_dec: begin // this state purpose is to determine (decode) which is the next address for  transaction
             
         if (first == 0) begin // check if is this a first transaction or not  
           next_addr  = awaddr;
@@ -701,34 +706,33 @@ module axi_mem_slave(
       end  
       
       wreadys: begin
-        wready = 1'b1;
 
-        if (wvalid) begin
-            case (awburst)
-                2'b00: begin
-                    return_addr = data_wr_fixed(wstrb, awaddr);
-                end
-
-                2'b01: begin
-                    return_addr = data_wr_incr(wstrb, next_addr);
-                end
-
-                2'b10: begin
-                    boundary = wrap_boundary(awlen, awsize);
-                    return_addr = data_wr_wrap(wstrb, next_addr, boundary);
-                end
-            endcase
-
-            if (wlast == 1'b1) begin
-                wnext_state = widle;
-                wlen_count  = 0;
-                first       = 0;
-            end else begin
-                wnext_state = wvalids;
-            end
+        if (wlast == 1'b1) begin
+            wnext_state = widle;
+            wready      = 1'b0;
+            wlen_count  = 0;
+            first       = 0;
+        end else if (wlen_count < (awlen + 1)) begin
+            wnext_state = wvalids;
+            wready      = 1'b1;
         end else begin
             wnext_state = wreadys;
         end
+
+        case (awburst)
+            2'b00: begin
+                retaddr = data_wr_fixed(wstrb, awaddr);
+            end
+
+            2'b01: begin
+                retaddr = data_wr_incr(wstrb, nextaddr);
+            end
+
+            2'b10: begin
+                boundary = wrap_boundary(awlen, awsize);
+                retaddr  = data_wr_wrap(wstrb, nextaddr, boundary);
+            end
+        endcase
       end
           
           
