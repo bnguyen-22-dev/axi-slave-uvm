@@ -540,19 +540,6 @@ a boundary multiple.
 
 The read path is controlled by the AR FSM and R FSM:
 
-``` text
-AR channel
-    │
-    ▼
-  AR FSM
-    │
-    ▼
-  R FSM ◄──────── Internal Memory
-    │
-    ▼
-RDATA / RRESP / RVALID / RLAST
-```
-
 A read operation can be viewed as:
 
 ``` text
