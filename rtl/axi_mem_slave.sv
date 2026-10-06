@@ -102,6 +102,12 @@ module axi_mem_slave(
 
   reg [31:0] wdata_temp;
   reg [7:0] mem[128] = '{default:0};
+  // Clear memory whenever reset is asserted
+  always @(negedge resetn) begin
+      for (int i = 0; i < 128; i = i + 1) begin
+          mem[i] = 8'h00;
+      end
+  end
   reg [31:0] return_addr;
   reg [31:0] next_addr;
   reg first; // indicate if the it this the first transaction of the transfer => addr = awaddr
@@ -720,18 +726,20 @@ module axi_mem_slave(
         end
 
         case (awburst)
+
             2'b00: begin
-                retaddr = data_wr_fixed(wstrb, awaddr);
+                return_addr = data_wr_fixed(wstrb, awaddr);
             end
 
             2'b01: begin
-                retaddr = data_wr_incr(wstrb, nextaddr);
+                return_addr = data_wr_incr(wstrb, next_addr);
             end
 
             2'b10: begin
-                boundary = wrap_boundary(awlen, awsize);
-                retaddr  = data_wr_wrap(wstrb, nextaddr, boundary);
+                boundary    = wrap_boundary(awlen, awsize);
+                return_addr = data_wr_wrap(wstrb, next_addr, boundary);
             end
+
         endcase
       end
           
@@ -827,7 +835,7 @@ module axi_mem_slave(
       end
     
       arstart: begin
-        if (arvalid == 1'b1) begin
+        if (arvalid == 1'b1 && !rlast) begin
           arnext_state = arreadys;
           araddrt = araddr; 
         end else begin

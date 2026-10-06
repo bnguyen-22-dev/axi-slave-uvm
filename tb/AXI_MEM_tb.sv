@@ -34,17 +34,21 @@ class transaction extends uvm_sequence_item;
     rand bit [31:0] data_q[$];
     rand bit [3:0] strb[$];
 
-    bit [1:0] resp;   // store bresp rresp
+    // Write response
+    bit [1:0] resp;   
 
-    constraint c_size {
+    // Per-beat read responses
+    bit [1:0] resp_q[$];
+
+    constraint size_c {
       size inside {[0:2]};
     }
 
-    constraint c_burst {
+    constraint burst_c {
       burst inside {[0:2]};
     }
 
-    constraint c_addr {
+    constraint addr_c {
         if (burst == 2'b01) { // INCR burst
             addr + ((len + 1) * (1 << size)) <= 128;
         }
@@ -53,18 +57,19 @@ class transaction extends uvm_sequence_item;
         }
     }
 
-    constraint c_data {
+/*
+    constraint data_c {
         foreach (data_q[i])
             data_q[i] inside {[0:1024]};
     }
-	
+*/
   /*
   constraint c_data_q {
     unique {data_q};
   }
   */
 
-    constraint c_queue_size{
+    constraint size_queue_c{
         if (op_mode == AXI_WRITE) {
             data_q.size() == len + 1;
             strb.size() == len + 1;
@@ -74,15 +79,16 @@ class transaction extends uvm_sequence_item;
         }
     }
 
-    constraint c_strb { // exclude the 0000 case
+    constraint strb_c { // exclude the 0000 case
         foreach (strb[i]) {
             strb[i] inside {[4'b0001:4'b1111]};
         }
     }
 
-    constraint c_wrap_len {
+    constraint len_wrap_mode_c {
         if (burst == 2'b10) 
             len inside {4'd1, 4'd3, 4'd7, 4'd15};
+        
     }
 
 endclass
@@ -126,7 +132,7 @@ class single_write_test_seq extends uvm_sequence #(transaction);
             burst == 0; // fixed mode
             //randomize data
             //randomize address
-          strb[0] == 4'b1111;
+            strb[0] == 4'b1111;
         });
         finish_item(tr);
     endtask
@@ -180,13 +186,13 @@ class write_read_test_seq extends uvm_sequence #(transaction);
             burst == 0; // fixed mode
             //randomize data
             //randomize address
-          strb[0] == 4'b1111;
+            strb[0] == 4'b1111;
         });
         finish_item(tr_wr);
 
         tr_rd = transaction::type_id::create("tr_rd");
         start_item(tr_rd);
-      assert(tr_rd.randomize() with {
+        assert(tr_rd.randomize() with {
             op_mode == AXI_READ;
             len == tr_wr.len; // single read in a transfer
             size == tr_wr.size; // sending 4 bytes
@@ -198,11 +204,11 @@ class write_read_test_seq extends uvm_sequence #(transaction);
     endtask
 endclass
 
-// 5. fixed_burst_write_read_test
-class fixed_burst_write_read_test_seq extends uvm_sequence #(transaction);
-    `uvm_object_utils(fixed_burst_write_read_test_seq)
+// 5. fixed_burst_test
+class fixed_burst_test_seq extends uvm_sequence #(transaction);
+    `uvm_object_utils(fixed_burst_test_seq)
 
-    function new(string path = "fixed_burst_write_read_test_seq");
+    function new(string path = "fixed_burst_test_seq");
         super.new(path);
     endfunction
 
@@ -228,7 +234,7 @@ class fixed_burst_write_read_test_seq extends uvm_sequence #(transaction);
 
         tr_rd = transaction::type_id::create("tr_rd");
         start_item(tr_rd);
-      assert(tr_rd.randomize() with {
+        assert(tr_rd.randomize() with {
             op_mode == AXI_READ;
             len == tr_wr.len; // single read in a transfer
             size == tr_wr.size; // sending 4 bytes
@@ -241,11 +247,11 @@ class fixed_burst_write_read_test_seq extends uvm_sequence #(transaction);
     
 endclass
 
-// 6. incr_burst_write_read_test
-class incr_burst_write_read_test_seq extends uvm_sequence #(transaction);
-    `uvm_object_utils(incr_burst_write_read_test_seq)
+// 6. incr_burst_test
+class incr_burst_test_seq extends uvm_sequence #(transaction);
+    `uvm_object_utils(incr_burst_test_seq)
 
-    function new(string path = "incr_burst_write_read_test_seq");
+    function new(string path = "incr_burst_test_seq");
         super.new(path);
     endfunction
 
@@ -270,11 +276,11 @@ class incr_burst_write_read_test_seq extends uvm_sequence #(transaction);
 
         tr_rd = transaction::type_id::create("tr_rd");
         start_item(tr_rd);
-      assert(tr_rd.randomize() with {
+        assert(tr_rd.randomize() with {
             op_mode == AXI_READ;
             len == tr_wr.len; // single read in a transfer
             size == tr_wr.size; // sending 4 bytes
-            burst == tr_wr.burst; // fixed mode
+            burst == tr_wr.burst; // incr mode
             addr == tr_wr.addr;
             //strb not use in read mode 
         });
@@ -283,11 +289,11 @@ class incr_burst_write_read_test_seq extends uvm_sequence #(transaction);
     
 endclass
 
-//7. wrap_burst_write_read_test
-class wrap_burst_write_read_test_seq extends uvm_sequence #(transaction);
-    `uvm_object_utils(wrap_burst_write_read_test_seq)
+//7. wrap_burst_test
+class wrap_burst_test_seq extends uvm_sequence #(transaction);
+    `uvm_object_utils(wrap_burst_test_seq)
 
-    function new(string path = "wrap_burst_write_read_test_seq");
+    function new(string path = "wrap_burst_test_seq");
         super.new(path);
     endfunction
     
@@ -312,11 +318,11 @@ class wrap_burst_write_read_test_seq extends uvm_sequence #(transaction);
 
         tr_rd = transaction::type_id::create("tr_rd");
         start_item(tr_rd);
-      assert(tr_rd.randomize() with {
+        assert(tr_rd.randomize() with {
             op_mode == AXI_READ;
             len == tr_wr.len; // single read in a transfer
             size == tr_wr.size; // sending 4 bytes
-            burst == tr_wr.burst; // fixed mode
+            burst == tr_wr.burst; // wrap mode
             addr == tr_wr.addr;
             //strb not use in read mode 
         });
@@ -343,7 +349,7 @@ class transfer_size_test_seq extends uvm_sequence #(transaction);
             assert(tr_wr.randomize() with {
                 op_mode == AXI_WRITE;
                 len > 0; // burst test, len > 0
-                size == s; // sending 4 bytes
+                size == s; 
                 burst == 1; // incr mode
                 //randomize data
                 //randomize address
@@ -363,11 +369,11 @@ class transfer_size_test_seq extends uvm_sequence #(transaction);
 
             tr_rd = transaction::type_id::create("tr_rd");
             start_item(tr_rd);
-              assert(tr_rd.randomize() with {
+            assert(tr_rd.randomize() with {
                 op_mode == AXI_READ;
-                len == tr_wr.len; // single read in a transfer
-                size == tr_wr.size; // sending 4 bytes
-                burst == tr_wr.burst; // fixed mode
+                len == tr_wr.len; 
+                size == tr_wr.size; 
+                burst == tr_wr.burst; 
                 addr == tr_wr.addr;
                 //strb not use in read mode 
             });
@@ -376,8 +382,8 @@ class transfer_size_test_seq extends uvm_sequence #(transaction);
         end
     endtask
 endclass
-//9. burst_length_test
 
+//9. burst_length_test
 class burst_length_test_seq extends uvm_sequence #(transaction);
     `uvm_object_utils(burst_length_test_seq)
 
@@ -388,7 +394,7 @@ class burst_length_test_seq extends uvm_sequence #(transaction);
     transaction tr_wr;
     transaction tr_rd;
 
-    int burst_length[$] = '{0, 1, 3, 7, 15};
+    int burst_length[$] = '{0, 1, 2, 3, 7, 10, 15};
 
     virtual task body();
         foreach (burst_length[i]) begin
@@ -401,8 +407,8 @@ class burst_length_test_seq extends uvm_sequence #(transaction);
                 burst == 1; // incr mode
                 //randomize data
                 //randomize address
-        });
-             foreach (tr_wr.strb[i]) begin
+            });
+            foreach (tr_wr.strb[i]) begin
                 tr_wr.strb[i] = 4'b1111;
             end
             
@@ -410,13 +416,12 @@ class burst_length_test_seq extends uvm_sequence #(transaction);
 
             tr_rd = transaction::type_id::create("tr_rd");
             start_item(tr_rd);
-          assert(tr_rd.randomize() with {
+            assert(tr_rd.randomize() with {
                 op_mode == AXI_READ;
-                len == tr_wr.len; // single read in a transfer
-                size == tr_wr.size; // sending 4 bytes
-                burst == tr_wr.burst; // fixed mode
+                len == tr_wr.len; 
+                size == tr_wr.size; 
+                burst == tr_wr.burst; 
                 addr == tr_wr.addr;
-                //strb not use in read mode 
             });
             finish_item(tr_rd);
         end
@@ -432,7 +437,8 @@ class partial_strobe_test_seq extends uvm_sequence #(transaction);
         super.new(path);
     endfunction
 
-    transaction tr_wr;
+    transaction tr_init;
+    transaction tr_partial;
     transaction tr_rd;
 
     bit [3:0] strobe_list[$] = '{
@@ -451,33 +457,63 @@ class partial_strobe_test_seq extends uvm_sequence #(transaction);
 
         foreach (strobe_list[i]) begin
 
-            tr_wr = transaction::type_id::create("tr_wr");
+            // ------------------------------------------------
+            // 1. Full write: initialize all 4 bytes
+            // ------------------------------------------------
+            tr_init = transaction::type_id::create("tr_init");
 
-            start_item(tr_wr);
-            assert(tr_wr.randomize() with {
+            start_item(tr_init);
+
+            assert(tr_init.randomize() with {
                 op_mode == AXI_WRITE;
-                len     == 0;
-                size    == 2;
-                burst   == 1;      // INCR
-                strb[0] == strobe_list[i];
+                len      == 0;
+                size     == 2;
+                burst    == 1;
+                strb[0]  == 4'b1111;
             });
-            finish_item(tr_wr);
+
+            finish_item(tr_init);
 
 
+            // ------------------------------------------------
+            // 2. Partial write to the SAME address
+            // ------------------------------------------------
+            tr_partial = transaction::type_id::create("tr_partial");
+
+            start_item(tr_partial);
+
+            assert(tr_partial.randomize() with {
+                op_mode == AXI_WRITE;
+                addr     == tr_init.addr;
+                len      == 0;
+                size     == 2;
+                burst    == 1;
+                strb[0]  == strobe_list[i];
+            });
+
+            finish_item(tr_partial);
+
+
+            // ------------------------------------------------
+            // 3. Read the complete 4-byte value back
+            // ------------------------------------------------
             tr_rd = transaction::type_id::create("tr_rd");
 
             start_item(tr_rd);
+
             assert(tr_rd.randomize() with {
                 op_mode == AXI_READ;
-                addr    == tr_wr.addr;
-                len     == tr_wr.len;
-                size    == tr_wr.size;
-                burst   == tr_wr.burst;
+                addr     == tr_init.addr;
+                len      == 0;
+                size     == 2;
+                burst    == 1;
             });
-            finish_item(tr_rd);
-        end
-    endtask
 
+            finish_item(tr_rd);
+
+        end
+
+    endtask
 endclass
 
 // 11. invalid_write_addr_test
@@ -494,20 +530,20 @@ class invalid_write_addr_test_seq extends uvm_sequence #(transaction);
         tr_wr = transaction::type_id::create("tr_wr");
 
         start_item(tr_wr);
-        tr_wr.c_addr.constraint_mode(0);
+        tr_wr.addr_c.constraint_mode(0);
         assert(tr_wr.randomize() with {
             op_mode == AXI_WRITE;
             len     == 0;
             size    == 2;
             burst   == 1;      // INCR
             strb[0] == 4'b1111;
-            addr > 128;
+            addr >= 128;
         });
         finish_item(tr_wr);
     endtask
 endclass
 
-// 12. invalid_read_size_test
+// 12. invalid_read_addr_test
 class invalid_read_addr_test_seq extends uvm_sequence #(transaction);
     `uvm_object_utils(invalid_read_addr_test_seq)
 
@@ -521,14 +557,14 @@ class invalid_read_addr_test_seq extends uvm_sequence #(transaction);
         tr_rd = transaction::type_id::create("tr_rd");
 
         start_item(tr_rd);
-        tr_rd.c_addr.constraint_mode(0);
-      assert(tr_rd.randomize() with {
+        tr_rd.addr_c.constraint_mode(0);
+        assert(tr_rd.randomize() with {
             op_mode == AXI_READ;
             len     == 0;
             size    == 2;
             burst   == 1;      // INCR
             // strb[0] == 4'b1111;
-            addr > 128;
+            addr >= 128;
         });
         finish_item(tr_rd);
     endtask
@@ -548,7 +584,7 @@ class invalid_write_size_test_seq extends uvm_sequence #(transaction);
         tr_wr = transaction::type_id::create("tr_wr");
 
         start_item(tr_wr);
-        tr_wr.c_size.constraint_mode(0);
+        tr_wr.size_c.constraint_mode(0);
         assert(tr_wr.randomize() with {
             op_mode == AXI_WRITE;
             len     == 0;
@@ -574,7 +610,7 @@ class invalid_read_size_test_seq extends uvm_sequence #(transaction);
         tr_rd = transaction::type_id::create("tr_rd");
 
         start_item(tr_rd);
-        tr_rd.c_size.constraint_mode(0);
+        tr_rd.size_c.constraint_mode(0);
         assert(tr_rd.randomize() with {
             op_mode == AXI_READ;
             len     == 0;
@@ -668,7 +704,7 @@ class corner_address_test_seq extends uvm_sequence #(transaction);
             else if (address_value[i] == 128) begin
                 tr_wr = transaction::type_id::create("tr_wr");
                 start_item(tr_wr);
-                tr_wr.c_addr.constraint_mode(0);
+                tr_wr.addr_c.constraint_mode(0);
                 assert(tr_wr.randomize() with {
                     op_mode == AXI_WRITE;
                     addr    == address_value[i];
@@ -677,11 +713,11 @@ class corner_address_test_seq extends uvm_sequence #(transaction);
                     burst   == 1;
                     strb[0] == 4'b1111;
                 });
-                tr_wr.c_addr.constraint_mode(1);
+                tr_wr.addr_c.constraint_mode(1);
                 finish_item(tr_wr);
                 tr_rd = transaction::type_id::create("tr_rd");
                 start_item(tr_rd);
-                tr_rd.c_addr.constraint_mode(0);
+                tr_rd.addr_c.constraint_mode(0);
                 assert(tr_rd.randomize() with {
                     op_mode == AXI_READ;
                     addr    == address_value[i];
@@ -689,7 +725,7 @@ class corner_address_test_seq extends uvm_sequence #(transaction);
                     size    == 2;
                     burst   == 1;
                 });
-                tr_rd.c_addr.constraint_mode(1);
+                tr_rd.addr_c.constraint_mode(1);
                 finish_item(tr_rd);
             end
         end
@@ -716,25 +752,29 @@ class corner_data_test_seq extends uvm_sequence #(transaction);
 
         foreach (data_value[i]) begin
 
+            // Write corner data value
             tr_wr = transaction::type_id::create("tr_wr");
 
             start_item(tr_wr);
-            tr_wr.c_data.constraint_mode(0);
+
             assert(tr_wr.randomize() with {
                 op_mode == AXI_WRITE;
                 len     == 0;
                 size    == 2;
                 burst   == 1;
             });
-            
+
             tr_wr.data_q[0] = data_value[i];
-            tr_wr. strb[0] = 4'b1111;
+            tr_wr.strb[0]   = 4'b1111;
+
             finish_item(tr_wr);
 
 
+            // Read back from the same address
             tr_rd = transaction::type_id::create("tr_rd");
 
             start_item(tr_rd);
+
             assert(tr_rd.randomize() with {
                 op_mode == AXI_READ;
                 addr    == tr_wr.addr;
@@ -742,12 +782,12 @@ class corner_data_test_seq extends uvm_sequence #(transaction);
                 size    == tr_wr.size;
                 burst   == tr_wr.burst;
             });
+
             finish_item(tr_rd);
 
         end
 
     endtask
-
 endclass
 
 
@@ -762,53 +802,87 @@ class pattern_test_seq extends uvm_sequence #(transaction);
     transaction tr_wr;
     transaction tr_rd;
 
-    bit [31:0] pattern_value[$] = '{
-        32'hAAAA_AAAA,
-        32'h5555_5555,
-        32'h0000_0001,
-        32'h0000_0002,
-        32'h0000_0004,
-        32'h0000_0008,
-        32'h0000_0010,
-        32'h0000_0020,
-        32'h0000_0040,
-        32'h0000_0080
-    };
+
+    // ---------------------------------------------------------
+    // Helper task:
+    // Write a specified 32-bit pattern and read it back
+    // ---------------------------------------------------------
+    task write_read_pattern(bit [31:0] pattern);
+
+        // -------------------------
+        // Write transaction
+        // -------------------------
+        tr_wr = transaction::type_id::create("tr_wr");
+
+        start_item(tr_wr);
+
+        assert(tr_wr.randomize() with {
+            op_mode == AXI_WRITE;
+            len     == 0;
+            size    == 2;      // 4-byte transfer
+            burst   == 1;      // INCR
+        });
+
+        tr_wr.data_q[0] = pattern;
+        tr_wr.strb[0]   = 4'b1111;
+
+        finish_item(tr_wr);
+
+
+        // -------------------------
+        // Read transaction
+        // -------------------------
+        tr_rd = transaction::type_id::create("tr_rd");
+
+        start_item(tr_rd);
+
+        assert(tr_rd.randomize() with {
+            op_mode == AXI_READ;
+            addr    == tr_wr.addr;
+            len     == tr_wr.len;
+            size    == tr_wr.size;
+            burst   == tr_wr.burst;
+        });
+
+        finish_item(tr_rd);
+
+    endtask
+
 
     virtual task body();
 
-        foreach (pattern_value[i]) begin
-
-            tr_wr = transaction::type_id::create("tr_wr");
-
-            start_item(tr_wr);
-            tr_wr.c_data.constraint_mode(0);
-            assert(tr_wr.randomize() with {
-                op_mode == AXI_WRITE;
-                len     == 0;
-                size    == 2;
-                burst   == 1;
-            });
-            
-            tr_wr.data_q[0] = pattern_value[i];
-            tr_wr.strb[0] = 4'b1111;
-            finish_item(tr_wr);
+        // -----------------------------------------------------
+        // Alternating bit patterns
+        // -----------------------------------------------------
+        write_read_pattern(32'hAAAA_AAAA);
+        write_read_pattern(32'h5555_5555);
 
 
-            tr_rd = transaction::type_id::create("tr_rd");
-            start_item(tr_rd);
-            assert(tr_rd.randomize() with {
-                op_mode == AXI_READ;
-                addr    == tr_wr.addr;
-                len     == tr_wr.len;
-                size    == tr_wr.size;
-                burst   == tr_wr.burst;
-            });
-            finish_item(tr_rd);
+        // -----------------------------------------------------
+        // Walking-1 and Walking-0 patterns
+        // -----------------------------------------------------
+        for (int i = 0; i < 32; i++) begin
+
+            // Walking-1:
+            // 0000...0001
+            // 0000...0010
+            // 0000...0100
+            // ...
+            // 1000...0000
+            write_read_pattern(32'h0000_0001 << i);
+
+            // Walking-0:
+            // FFFF...FFFE
+            // FFFF...FFFD
+            // FFFF...FFFB
+            // ...
+            // 7FFF...FFFF
+            write_read_pattern(~(32'h0000_0001 << i));
 
         end
 
     endtask
+
 endclass
 
 
@@ -854,18 +928,37 @@ class random_regression_seq extends uvm_sequence #(transaction);
 
         repeat (50) begin
 
+            // ---------------------------------------------
+            // Random legal write transaction
+            // ---------------------------------------------
             tr_wr = transaction::type_id::create("tr_wr");
 
             start_item(tr_wr);
+
             assert(tr_wr.randomize() with {
                 op_mode == AXI_WRITE;
             });
+
+            // Match WSTRB to the randomized transfer size
+            foreach (tr_wr.strb[i]) begin
+                if (tr_wr.size == 0)
+                    tr_wr.strb[i] = 4'b0001;
+                else if (tr_wr.size == 1)
+                    tr_wr.strb[i] = 4'b0011;
+                else
+                    tr_wr.strb[i] = 4'b1111;
+            end
+
             finish_item(tr_wr);
 
 
+            // ---------------------------------------------
+            // Read back using the same transaction settings
+            // ---------------------------------------------
             tr_rd = transaction::type_id::create("tr_rd");
 
             start_item(tr_rd);
+
             assert(tr_rd.randomize() with {
                 op_mode == AXI_READ;
                 addr    == tr_wr.addr;
@@ -873,8 +966,11 @@ class random_regression_seq extends uvm_sequence #(transaction);
                 size    == tr_wr.size;
                 burst   == tr_wr.burst;
             });
+
             finish_item(tr_rd);
+
         end
+
     endtask
 endclass
 
@@ -1073,10 +1169,9 @@ class monitor extends uvm_monitor;
 
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
-        tr_mon = transaction::type_id::create("tr_mon");
         port = new("port", this);
 
-      if (!uvm_config_db #(virtual axi_if)::get(this, "", "vif", vif))
+        if (!uvm_config_db #(virtual axi_if)::get(this, "", "vif", vif))
             `uvm_error("MON", "Unable to access interface")
     endfunction
 
@@ -1096,12 +1191,17 @@ class monitor extends uvm_monitor;
         //$display("Monitor start to collect all write beats");
 
         // collect all write beats
-      for (int i = 0; i < vif.awlen + 1; i++) begin
-            do begin
+        for (int i = 0; i < tr_mon.len + 1; i++) begin
+
+            while (!(vif.wvalid && vif.wready)) begin
                 @(posedge vif.clk);
-            end while (!(vif.wvalid && vif.wready));
+            end
+
             tr_mon.data_q.push_back(vif.wdata);
             tr_mon.strb.push_back(vif.wstrb);
+
+            // Move past this accepted beat before looking for the next one
+            @(posedge vif.clk);
         end
         
         //$display("Monitor succesfully collect all write beats");
@@ -1118,37 +1218,81 @@ class monitor extends uvm_monitor;
     endtask
 
     task collect_read();
+
+        // ----------------------------------------------------
+        // Capture read transaction information
+        // ----------------------------------------------------
         tr_mon.op_mode = AXI_READ;
-        tr_mon.id = vif.arid;
-        tr_mon.addr = vif.araddr;
+        tr_mon.id      = vif.arid;
+        tr_mon.addr    = vif.araddr;
         tr_mon.len     = vif.arlen;
         tr_mon.size    = vif.arsize;
         tr_mon.burst   = vif.arburst;
 
+        // Clear queues before collecting this transaction
         tr_mon.data_q.delete();
         tr_mon.strb.delete();
+        tr_mon.resp_q.delete();
 
-        // collect all read beats
-      for (int i  = 0; i < vif.arlen + 1; i++) begin
+
+        // ----------------------------------------------------
+        // Collect all read beats
+        // ----------------------------------------------------
+        for (int i = 0; i < tr_mon.len + 1; i++) begin
+
+            // Wait until a read beat is available and accepted
             while (!(vif.rvalid && vif.rready)) begin
                 @(posedge vif.clk);
-            end 
-           //`uvm_info("MON", $sformatf("READ beat %0d sampled: rdata=%0d rvalid=%0b rready=%0b rlast=%0b",i, vif.rdata, vif.rvalid, vif.rready, vif.rlast), UVM_MEDIUM)
+            end
+
+            // Sample data and response for this beat
             tr_mon.data_q.push_back(vif.rdata);
-            tr_mon.resp = vif.rresp;
+            tr_mon.resp_q.push_back(vif.rresp);
+
+            `uvm_info(
+                "MON",
+                $sformatf(
+                    "READ beat %0d sampled: RDATA=%h | RRESP=%0b",
+                    i,
+                    vif.rdata,
+                    vif.rresp
+                ),
+                UVM_HIGH
+            )
+
+            // Move past this beat before looking for the next one
             @(posedge vif.clk);
+
         end
-        
-        `uvm_info("MON", $sformatf("Monitor sample AXI_READ succesfully. araddr: %0d | data_q: %0p | strb: %0p | bresp: %0b",tr_mon.addr, tr_mon.data_q, tr_mon.strb, tr_mon.resp), UVM_MEDIUM)
+
+
+        // ----------------------------------------------------
+        // Completed read transaction
+        // ----------------------------------------------------
+        `uvm_info(
+            "MON",
+            $sformatf(
+                "AXI_READ sampled successfully. addr=%0d | beats=%0d | data_q=%0p | resp_q=%0p",
+                tr_mon.addr,
+                tr_mon.len + 1,
+                tr_mon.data_q,
+                tr_mon.resp_q
+            ),
+            UVM_MEDIUM
+        )
+
+        // Send completed transaction to scoreboard
         port.write(tr_mon);
+
     endtask
 
 
-      virtual task run_phase(uvm_phase phase);
+    virtual task run_phase(uvm_phase phase);
         forever begin
             @(posedge vif.clk);
 
             if (!vif.resetn && !reset_seen) begin
+                tr_mon = transaction::type_id::create("tr_mon");
                 tr_mon.op_mode = AXI_RESET;
                 `uvm_info("MON", "DUT RESET DETECTED", UVM_MEDIUM)
                 port.write(tr_mon);
@@ -1161,13 +1305,14 @@ class monitor extends uvm_monitor;
                 reset_seen = 0;
             end
 
-            if (vif.awvalid && vif.awready) begin
+            if (vif.awvalid) begin
                 //$display("Test sequence get to sample write");
+                tr_mon = transaction::type_id::create("tr_mon");
                 collect_write();
-            end else if (vif.arvalid && vif.arready) begin
+            end else if (vif.arvalid) begin
                 //$display("Test sequence get to sample read");
+                tr_mon = transaction::type_id::create("tr_mon");
                 collect_read();
-
             end
         end
     endtask
@@ -1202,8 +1347,7 @@ class scoreboard extends uvm_scoreboard;
         bit [31:0] curr_addr,
         bit [1:0]  burst,
         bit [2:0]  size,
-        bit [3:0]  len,
-        bit [31:0] start_addr
+        bit [3:0]  len
     );
 
         int bytes;
@@ -1235,6 +1379,10 @@ class scoreboard extends uvm_scoreboard;
         tr_sco = data;
         case (tr_sco.op_mode)
             AXI_RESET: begin
+
+                foreach (ref_mem[i]) begin
+                    ref_mem[i] = '0;
+                end
                 `uvm_info("SCO", "DUT RESET DETECTED", UVM_MEDIUM)
             end
 
@@ -1245,43 +1393,37 @@ class scoreboard extends uvm_scoreboard;
 
                 if (tr_sco.resp != 2'b00) begin
                     `uvm_info("SCO", "Write response is error, reference memory not updated", UVM_MEDIUM)
-                end 
-                else begin
+                end else begin
                     foreach (tr_sco.data_q[i]) begin
                         bit [31:0] beat_addr;
 
                         beat_addr = addr;
 
                         if (tr_sco.strb[i][0]) begin
-                            if (beat_addr < 128)
-                                ref_mem[beat_addr] = tr_sco.data_q[i][7:0];
-                            beat_addr++;
+                            if (addr < 128)
+                                ref_mem[addr] = tr_sco.data_q[i][7:0];
                         end
 
                         if (tr_sco.strb[i][1]) begin
-                            if (beat_addr < 128)
-                                ref_mem[beat_addr] = tr_sco.data_q[i][15:8];
-                            beat_addr++;
+                            if ((addr + 1) < 128)
+                                ref_mem[addr + 1] = tr_sco.data_q[i][15:8];
                         end
 
                         if (tr_sco.strb[i][2]) begin
-                            if (beat_addr < 128)
-                                ref_mem[beat_addr] = tr_sco.data_q[i][23:16];
-                            beat_addr++;
+                            if ((addr + 2) < 128)
+                                ref_mem[addr + 2] = tr_sco.data_q[i][23:16];
                         end
 
                         if (tr_sco.strb[i][3]) begin
-                            if (beat_addr < 128)
-                                ref_mem[beat_addr] = tr_sco.data_q[i][31:24];
-                            beat_addr++;
+                            if ((addr + 3) < 128)
+                                ref_mem[addr + 3] = tr_sco.data_q[i][31:24];
                         end
 
                         addr = next_addr(
                             addr,
                             tr_sco.burst,
                             tr_sco.size,
-                            tr_sco.len,
-                            tr_sco.addr
+                            tr_sco.len
                         );
                     end
 
@@ -1295,53 +1437,110 @@ class scoreboard extends uvm_scoreboard;
 
                 addr = tr_sco.addr;
 
-                if (tr_sco.resp != 2'b00) begin
-                    `uvm_info("SCO", "Read response is error, skipping data comparison", UVM_MEDIUM)
-                end
-                else begin
-                    foreach (tr_sco.data_q[i]) begin
+                foreach (tr_sco.data_q[i]) begin
 
+                    // ------------------------------------------------
+                    // Check response for this read beat
+                    // ------------------------------------------------
+                    if (tr_sco.resp_q[i] != 2'b00) begin
+
+                        `uvm_info(
+                            "SCO",
+                            $sformatf(
+                                "READ response error: beat=%0d | addr=%0d | RRESP=%0b | skipping data comparison",
+                                i,
+                                addr,
+                                tr_sco.resp_q[i]
+                            ),
+                            UVM_MEDIUM
+                        )
+
+                    end else begin
+
+                        // --------------------------------------------
+                        // Build expected read data
+                        // --------------------------------------------
                         expected = '0;
 
-                    expected = '0;
+                        case (tr_sco.size)
 
-                    case (tr_sco.size)
-                        3'd0: begin
-                            if (addr < 128)
-                                expected[7:0] = ref_mem[addr];
-                        end
-                    
-                        3'd1: begin
-                            if (addr < 128)
-                                expected[7:0] = ref_mem[addr];
-                            if ((addr + 1) < 128)
-                                expected[15:8] = ref_mem[addr + 1];
-                        end
-                    
-                        3'd2: begin
-                            if (addr < 128)
-                                expected[7:0] = ref_mem[addr];
-                            if ((addr + 1) < 128)
-                                expected[15:8] = ref_mem[addr + 1];
-                            if ((addr + 2) < 128)
-                                expected[23:16] = ref_mem[addr + 2];
-                            if ((addr + 3) < 128)
-                                expected[31:24] = ref_mem[addr + 3];
-                        end
-                    endcase
+                            // 1-byte transfer
+                            3'd0: begin
+                                if (addr < 128)
+                                    expected[7:0] = ref_mem[addr];
+                            end
 
+                            // 2-byte transfer
+                            3'd1: begin
+                                if (addr < 128)
+                                    expected[7:0] = ref_mem[addr];
+
+                                if ((addr + 1) < 128)
+                                    expected[15:8] = ref_mem[addr + 1];
+                            end
+
+                            // 4-byte transfer
+                            3'd2: begin
+                                if (addr < 128)
+                                    expected[7:0] = ref_mem[addr];
+
+                                if ((addr + 1) < 128)
+                                    expected[15:8] = ref_mem[addr + 1];
+
+                                if ((addr + 2) < 128)
+                                    expected[23:16] = ref_mem[addr + 2];
+
+                                if ((addr + 3) < 128)
+                                    expected[31:24] = ref_mem[addr + 3];
+                            end
+
+                        endcase
+
+
+                        // --------------------------------------------
+                        // Compare actual vs expected
+                        // --------------------------------------------
                         if (tr_sco.data_q[i] !== expected) begin
-                            `uvm_error("SCO",
-                                $sformatf("READ MISMATCH beat = %0d | addr= %0d | expected = %0d | actual= %0d",
-                                        i, addr, expected, tr_sco.data_q[i]))
-                        end else begin
-                            `uvm_info("SCO",
-                                $sformatf("READ MATCH beat = %0d | addr = %0d | data = %0d",
-                                        i, addr, tr_sco.data_q[i]), UVM_LOW)
-                        end
 
-                        addr = next_addr(addr, tr_sco.burst, tr_sco.size, tr_sco.len, tr_sco.addr);
+                            `uvm_error(
+                                "SCO",
+                                $sformatf(
+                                    "READ MISMATCH beat=%0d | addr=%0d | expected=%h | actual=%h",
+                                    i,
+                                    addr,
+                                    expected,
+                                    tr_sco.data_q[i]
+                                )
+                            )
+
+                        end
+                        else begin
+
+                            `uvm_info(
+                                "SCO",
+                                $sformatf(
+                                    "READ MATCH beat=%0d | addr=%0d | data=%h",
+                                    i,
+                                    addr,
+                                    tr_sco.data_q[i]
+                                ),
+                                UVM_LOW
+                            )
+
+                        end
                     end
+
+
+                    // ------------------------------------------------
+                    // Calculate address of next read beat
+                    // ------------------------------------------------
+                    addr = next_addr(
+                        addr,
+                        tr_sco.burst,
+                        tr_sco.size,
+                        tr_sco.len
+                    );
+
                 end
             end
         endcase
@@ -1370,7 +1569,7 @@ class agent extends uvm_agent;
 
         if (cfg.agent_type == UVM_ACTIVE) begin
             drv = driver::type_id::create("drv", this);
-          seqr = uvm_sequencer#(transaction)::type_id::create("seqr", this);
+            seqr = uvm_sequencer#(transaction)::type_id::create("seqr", this);
         end
     endfunction
 
@@ -1413,151 +1612,310 @@ class test extends uvm_test;
     function new(string path = "test", uvm_component parent = null);
         super.new(path, parent);
     endfunction
-    
+
+
+    // ============================================================
+    // Environment
+    // ============================================================
+
     env e;
 
-    reset_test_seq                  reset_seq;
-    single_write_test_seq           single_wr_seq;
-    single_read_test_seq            single_rd_seq;
-    write_read_test_seq             wr_rd_seq;
-    fixed_burst_write_read_test_seq fixed_burst_seq;
-    incr_burst_write_read_test_seq  incr_burst_seq;
-    wrap_burst_write_read_test_seq  wrap_burst_seq;
-    transfer_size_test_seq          transfer_size_seq;
-    burst_length_test_seq           burst_length_seq;
-    partial_strobe_test_seq         partial_strobe_seq;
-    invalid_write_addr_test_seq     invalid_wr_addr_seq;
-    invalid_read_addr_test_seq      invalid_rd_addr_seq;
-    invalid_write_size_test_seq     invalid_wr_size_seq;
-    invalid_read_size_test_seq      invalid_rd_size_seq;
-    corner_address_test_seq         corner_addr_seq;
-    corner_data_test_seq            corner_data_seq;
-    pattern_test_seq                pattern_seq;
-    read_before_write_test_seq      read_before_wr_seq;
-    random_regression_seq           random_seq;
+
+    // ============================================================
+    // Test Sequences
+    // ============================================================
+
+    reset_test_seq              reset_seq;
+
+    single_write_test_seq       single_wr_seq;
+    single_read_test_seq        single_rd_seq;
+    write_read_test_seq         wr_rd_seq;
+
+    fixed_burst_test_seq        fixed_burst_seq;
+    incr_burst_test_seq         incr_burst_seq;
+    wrap_burst_test_seq         wrap_burst_seq;
+
+    transfer_size_test_seq      transfer_size_seq;
+    burst_length_test_seq       burst_length_seq;
+    partial_strobe_test_seq     partial_strobe_seq;
+
+    invalid_write_addr_test_seq invalid_wr_addr_seq;
+    invalid_read_addr_test_seq  invalid_rd_addr_seq;
+    invalid_write_size_test_seq invalid_wr_size_seq;
+    invalid_read_size_test_seq  invalid_rd_size_seq;
+
+    corner_address_test_seq     corner_addr_seq;
+    corner_data_test_seq        corner_data_seq;
+    pattern_test_seq            pattern_seq;
+
+    read_before_write_test_seq  read_before_wr_seq;
+
+    random_regression_seq       random_seq;
+
+
+    // ============================================================
+    // Build Phase
+    // ============================================================
 
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
 
+        // Create environment
         e = env::type_id::create("e", this);
 
-        reset_seq          = reset_test_seq::type_id::create("reset_seq");
-        single_wr_seq      = single_write_test_seq::type_id::create("single_wr_seq");
-        single_rd_seq      = single_read_test_seq::type_id::create("single_rd_seq");
-        wr_rd_seq          = write_read_test_seq::type_id::create("wr_rd_seq");
-        fixed_burst_seq    = fixed_burst_write_read_test_seq::type_id::create("fixed_burst_seq");
-        incr_burst_seq     = incr_burst_write_read_test_seq::type_id::create("incr_burst_seq");
-        wrap_burst_seq     = wrap_burst_write_read_test_seq::type_id::create("wrap_burst_seq");
-        transfer_size_seq  = transfer_size_test_seq::type_id::create("transfer_size_seq");
-        burst_length_seq   = burst_length_test_seq::type_id::create("burst_length_seq");
-        partial_strobe_seq = partial_strobe_test_seq::type_id::create("partial_strobe_seq");
-        invalid_wr_addr_seq = invalid_write_addr_test_seq::type_id::create("invalid_wr_addr_seq");
-        invalid_rd_addr_seq = invalid_read_addr_test_seq::type_id::create("invalid_rd_addr_seq");
-        invalid_wr_size_seq = invalid_write_size_test_seq::type_id::create("invalid_wr_size_seq");
-        invalid_rd_size_seq = invalid_read_size_test_seq::type_id::create("invalid_rd_size_seq");
-        corner_addr_seq    = corner_address_test_seq::type_id::create("corner_addr_seq");
-        corner_data_seq    = corner_data_test_seq::type_id::create("corner_data_seq");
-        pattern_seq        = pattern_test_seq::type_id::create("pattern_seq");
-        read_before_wr_seq = read_before_write_test_seq::type_id::create("read_before_wr_seq");
-        random_seq         = random_regression_seq::type_id::create("random_seq");
+
+        // Create sequences
+        reset_seq =
+            reset_test_seq::type_id::create("reset_seq");
+
+        single_wr_seq =
+            single_write_test_seq::type_id::create("single_wr_seq");
+
+        single_rd_seq =
+            single_read_test_seq::type_id::create("single_rd_seq");
+
+        wr_rd_seq =
+            write_read_test_seq::type_id::create("wr_rd_seq");
+
+        fixed_burst_seq =
+            fixed_burst_test_seq::type_id::create("fixed_burst_seq");
+
+        incr_burst_seq =
+            incr_burst_test_seq::type_id::create("incr_burst_seq");
+
+        wrap_burst_seq =
+            wrap_burst_test_seq::type_id::create("wrap_burst_seq");
+
+        transfer_size_seq =
+            transfer_size_test_seq::type_id::create("transfer_size_seq");
+
+        burst_length_seq =
+            burst_length_test_seq::type_id::create("burst_length_seq");
+
+        partial_strobe_seq =
+            partial_strobe_test_seq::type_id::create("partial_strobe_seq");
+
+        invalid_wr_addr_seq =
+            invalid_write_addr_test_seq::type_id::create("invalid_wr_addr_seq");
+
+        invalid_rd_addr_seq =
+            invalid_read_addr_test_seq::type_id::create("invalid_rd_addr_seq");
+
+        invalid_wr_size_seq =
+            invalid_write_size_test_seq::type_id::create("invalid_wr_size_seq");
+
+        invalid_rd_size_seq =
+            invalid_read_size_test_seq::type_id::create("invalid_rd_size_seq");
+
+        corner_addr_seq =
+            corner_address_test_seq::type_id::create("corner_addr_seq");
+
+        corner_data_seq =
+            corner_data_test_seq::type_id::create("corner_data_seq");
+
+        pattern_seq =
+            pattern_test_seq::type_id::create("pattern_seq");
+
+        read_before_wr_seq =
+            read_before_write_test_seq::type_id::create("read_before_wr_seq");
+
+        random_seq =
+            random_regression_seq::type_id::create("random_seq");
+
     endfunction
 
-    virtual task run_phase(uvm_phase phase);
-        phase.raise_objection(this);
-        /* Pass these cases
-        $display("-------------------------reset_seq_test----------------------");
+
+    // ============================================================
+    // Helper Task
+    //
+    // Reset DUT before each sequence so that every directed test
+    // begins from a known state.
+    // ============================================================
+
+    task run_seq_with_reset(
+        uvm_sequence #(transaction) seq,
+        string test_name
+    );
+
+        `uvm_info(
+            "TEST",
+            $sformatf(
+                "================ STARTING %s ================",
+                test_name
+            ),
+            UVM_LOW
+        )
+
+        // Reset DUT before running this test
         reset_seq.start(e.a.seqr);
 
-      
-		$display("-------------------------single_wr_seq_test----------------------");
-        single_wr_seq.start(e.a.seqr);
-      
-        $display("-------------------------single_rd_seq_test----------------------");
+        // Run directed sequence
+        seq.start(e.a.seqr);
+
+        `uvm_info(
+            "TEST",
+            $sformatf(
+                "================ COMPLETED %s ================",
+                test_name
+            ),
+            UVM_LOW
+        )
+
+    endtask
+
+
+    // ============================================================
+    // Run Phase
+    // ============================================================
+
+    virtual task run_phase(uvm_phase phase);
+
+        phase.raise_objection(this);
+
+
+        // --------------------------------------------------------
+        // Reset Test
+        // --------------------------------------------------------
+
+        `uvm_info(
+            "TEST",
+            "================ STARTING RESET TEST ================",
+            UVM_LOW
+        )
+
         reset_seq.start(e.a.seqr);
-        single_rd_seq.start(e.a.seqr);
-      
-        $display("-------------------------wr_rd_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        wr_rd_seq.start(e.a.seqr);
- 
-        $display("-------------------------fixed_burst_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        fixed_burst_seq.start(e.a.seqr);
-        
-        $display("-------------------------incr_burst_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        incr_burst_seq.start(e.a.seqr);
-        
-        $display("-------------------------wrap_burst_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        wrap_burst_seq.start(e.a.seqr);
-      */
-        
-  
-         /* Failed these cases because of INCR write address did not reliably advance between beats and 
-            Internal burst state leaked across separate transactions
-        $display("------------------------- transfer_size_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        transfer_size_seq.start(e.a.seqr);
-       
-        $display("------------------------- burst_length_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        burst_length_seq.start(e.a.seqr);
-        
-        
-        $display("-------------------------  partial_strobe_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        partial_strobe_seq.start(e.a.seqr);
-        */
-        
-        /* Pass these cases
-        $display("-------------------------invalid_wr_addr_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        invalid_wr_addr_seq.start(e.a.seqr);
-        
-        $display("-------------------------invalid_rd_addr_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        invalid_rd_addr_seq.start(e.a.seqr);
-        
-        $display("------------------------- invalid_wr_size_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        invalid_wr_size_seq.start(e.a.seqr);
-        
-        $display("-------------------------invalid_rd_size_seq_test----------------------");
-        reset_seq.start(e.a.seqr);
-        invalid_rd_size_seq.start(e.a.seqr);
-        */
-        
-         /* Pass these case
-         $display("-------------------------corner_addr_seq_test----------------------");
-         reset_seq.start(e.a.seqr);
-         corner_addr_seq.start(e.a.seqr);
-         
-         
-         $display("-------------------------corner_data_seq_test----------------------");
-         reset_seq.start(e.a.seqr);
-         corner_data_seq.start(e.a.seqr);
-         */
-         
-         /* Pass these case, reset mechanic of DUT is not correct, not resetting the memories
-         $display("-------------------------pattern_seq_test----------------------");
-         reset_seq.start(e.a.seqr);
-         pattern_seq.start(e.a.seqr);
-       
-         $display("-------------------------read_before_wr_seq_test----------------------");
-         reset_seq.start(e.a.seqr); 
-         read_before_wr_seq.start(e.a.seqr);
-         */
-        
-        /* Fail this case because of those above error
-        $display("-------------------------random_seq_test----------------------");
-        reset_seq.start(e.a.seqr); 
-        random_seq.start(e.a.seqr);
-        */
+
+
+        // --------------------------------------------------------
+        // Basic Read / Write
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            single_wr_seq,
+            "SINGLE WRITE TEST"
+        );
+
+        run_seq_with_reset(
+            single_rd_seq,
+            "SINGLE READ TEST"
+        );
+
+        run_seq_with_reset(
+            wr_rd_seq,
+            "WRITE-READ TEST"
+        );
+
+
+        // --------------------------------------------------------
+        // Burst Modes
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            fixed_burst_seq,
+            "FIXED BURST TEST"
+        );
+
+        run_seq_with_reset(
+            incr_burst_seq,
+            "INCR BURST TEST"
+        );
+
+        run_seq_with_reset(
+            wrap_burst_seq,
+            "WRAP BURST TEST"
+        );
+
+
+        // --------------------------------------------------------
+        // Transfer Configuration
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            transfer_size_seq,
+            "TRANSFER SIZE TEST"
+        );
+
+        run_seq_with_reset(
+            burst_length_seq,
+            "BURST LENGTH TEST"
+        );
+
+        run_seq_with_reset(
+            partial_strobe_seq,
+            "PARTIAL STROBE TEST"
+        );
+
+
+        // --------------------------------------------------------
+        // Invalid Transactions
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            invalid_wr_addr_seq,
+            "INVALID WRITE ADDRESS TEST"
+        );
+
+        run_seq_with_reset(
+            invalid_rd_addr_seq,
+            "INVALID READ ADDRESS TEST"
+        );
+
+        run_seq_with_reset(
+            invalid_wr_size_seq,
+            "INVALID WRITE SIZE TEST"
+        );
+
+        run_seq_with_reset(
+            invalid_rd_size_seq,
+            "INVALID READ SIZE TEST"
+        );
+
+
+        // --------------------------------------------------------
+        // Corner Cases
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            corner_addr_seq,
+            "CORNER ADDRESS TEST"
+        );
+
+        run_seq_with_reset(
+            corner_data_seq,
+            "CORNER DATA TEST"
+        );
+
+        run_seq_with_reset(
+            pattern_seq,
+            "DATA PATTERN TEST"
+        );
+
+
+        // --------------------------------------------------------
+        // Memory Behavior
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            read_before_wr_seq,
+            "READ BEFORE WRITE TEST"
+        );
+
+
+        // --------------------------------------------------------
+        // Random Regression
+        // --------------------------------------------------------
+
+        run_seq_with_reset(
+            random_seq,
+            "RANDOM REGRESSION TEST"
+        );
+
+
+        // Allow final monitor / scoreboard activity to settle
         #100;
 
-
         phase.drop_objection(this);
+
     endtask
 
 endclass
