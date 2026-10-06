@@ -12,7 +12,7 @@ The Design Under Test (DUT) is an **educational AXI-inspired implementation** wi
 
 The primary focus of this project is **Design Verification**: building a reusable UVM environment, developing directed and constrained-random stimulus, implementing a self-checking reference-memory scoreboard, adding assertion-based checks, and debugging interactions between the DUT and verification environment.
 
-A detailed description of the implemented RTL behavior, architecture, and known limitations is available in [`docs/RTL_DESIGN_ANALYSIS.md`](docs/RTL_DESIGN_ANALYSIS.md).
+A detailed description of the implemented RTL behavior, architecture, and known limitations is available in [`rtl/RTL_DESIGN_ANALYSIS.md`](docs/RTL_DESIGN_ANALYSIS.md).
 
 | Attribute | Value |
 |-----------|-------|
