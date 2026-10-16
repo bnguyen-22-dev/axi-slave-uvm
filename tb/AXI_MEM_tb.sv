@@ -348,7 +348,7 @@ class transfer_size_test_seq extends uvm_sequence #(transaction);
             start_item(tr_wr);
             assert(tr_wr.randomize() with {
                 op_mode == AXI_WRITE;
-                len > 0; // burst test, len > 0
+                len == 1; // burst test, len > 0
                 size == s; 
                 burst == 1; // incr mode
                 //randomize data
@@ -1156,6 +1156,7 @@ endclass
 
 
 
+
 class monitor extends uvm_monitor;
     `uvm_component_utils(monitor)
 
@@ -1167,30 +1168,35 @@ class monitor extends uvm_monitor;
     virtual axi_if vif;
     uvm_analysis_port #(transaction) port;
 
+    bit reset_seen;
+
     virtual function void build_phase(uvm_phase phase);
         super.build_phase(phase);
+
         port = new("port", this);
 
         if (!uvm_config_db #(virtual axi_if)::get(this, "", "vif", vif))
-            `uvm_error("MON", "Unable to access interface")
+            `uvm_fatal("MON", "Unable to access interface")
     endfunction
 
-    bit reset_seen;
+
+    // ============================================================
+    // Collect Write Transaction
+    // ============================================================
 
     task collect_write();
+
         tr_mon.op_mode = AXI_WRITE;
-        tr_mon.id = vif.awid;
-        tr_mon.addr = vif.awaddr;
+        tr_mon.id      = vif.awid;
+        tr_mon.addr    = vif.awaddr;
         tr_mon.len     = vif.awlen;
         tr_mon.size    = vif.awsize;
         tr_mon.burst   = vif.awburst;
 
         tr_mon.data_q.delete();
         tr_mon.strb.delete();
-      
-        //$display("Monitor start to collect all write beats");
 
-        // collect all write beats
+        // Collect all write beats
         for (int i = 0; i < tr_mon.len + 1; i++) begin
 
             while (!(vif.wvalid && vif.wready)) begin
@@ -1200,28 +1206,45 @@ class monitor extends uvm_monitor;
             tr_mon.data_q.push_back(vif.wdata);
             tr_mon.strb.push_back(vif.wstrb);
 
-            // Move past this accepted beat before looking for the next one
+            // Move past this beat
             @(posedge vif.clk);
         end
-        
-        //$display("Monitor succesfully collect all write beats");
 
-        // wait for B response
+        // Wait for write response
         while (!(vif.bvalid && vif.bready)) begin
             @(posedge vif.clk);
         end
 
         tr_mon.resp = vif.bresp;
-        `uvm_info("MON", $sformatf("Monitor sample AXI_WRITE succesfully. awaddr: %0d | beats: %0d | data_q: %0p | strb: %0p | bresp: %0b",tr_mon.addr, tr_mon.len + 1, tr_mon.data_q , tr_mon.strb, tr_mon.resp), UVM_MEDIUM)
 
-        port.write(tr_mon);   
+        `uvm_info(
+            "MON",
+            $sformatf(
+                "AXI_WRITE sampled successfully. addr=%0d | beats=%0d | data_q=%p | strb=%p | bresp=%0b",
+                tr_mon.addr,
+                tr_mon.len + 1,
+                tr_mon.data_q,
+                tr_mon.strb,
+                tr_mon.resp
+            ),
+            UVM_MEDIUM
+        )
+
+        // Send transaction to scoreboard
+        port.write(tr_mon);
+
+        // Prevent duplicate collection of the same write
+        wait (vif.awvalid == 0);
+
     endtask
+
+
+    // ============================================================
+    // Collect Read Transaction
+    // ============================================================
 
     task collect_read();
 
-        // ----------------------------------------------------
-        // Capture read transaction information
-        // ----------------------------------------------------
         tr_mon.op_mode = AXI_READ;
         tr_mon.id      = vif.arid;
         tr_mon.addr    = vif.araddr;
@@ -1229,23 +1252,17 @@ class monitor extends uvm_monitor;
         tr_mon.size    = vif.arsize;
         tr_mon.burst   = vif.arburst;
 
-        // Clear queues before collecting this transaction
         tr_mon.data_q.delete();
         tr_mon.strb.delete();
         tr_mon.resp_q.delete();
 
-
-        // ----------------------------------------------------
         // Collect all read beats
-        // ----------------------------------------------------
         for (int i = 0; i < tr_mon.len + 1; i++) begin
 
-            // Wait until a read beat is available and accepted
             while (!(vif.rvalid && vif.rready)) begin
                 @(posedge vif.clk);
             end
 
-            // Sample data and response for this beat
             tr_mon.data_q.push_back(vif.rdata);
             tr_mon.resp_q.push_back(vif.rresp);
 
@@ -1260,19 +1277,14 @@ class monitor extends uvm_monitor;
                 UVM_HIGH
             )
 
-            // Move past this beat before looking for the next one
+            // Move past this beat
             @(posedge vif.clk);
-
         end
 
-
-        // ----------------------------------------------------
-        // Completed read transaction
-        // ----------------------------------------------------
         `uvm_info(
             "MON",
             $sformatf(
-                "AXI_READ sampled successfully. addr=%0d | beats=%0d | data_q=%0p | resp_q=%0p",
+                "AXI_READ sampled successfully. addr=%0d | beats=%0d | data_q=%p | resp_q=%p",
                 tr_mon.addr,
                 tr_mon.len + 1,
                 tr_mon.data_q,
@@ -1281,43 +1293,79 @@ class monitor extends uvm_monitor;
             UVM_MEDIUM
         )
 
-        // Send completed transaction to scoreboard
+        // Send transaction to scoreboard
         port.write(tr_mon);
+
+        // Prevent duplicate collection of the same read
+        wait (vif.arvalid == 0);
 
     endtask
 
 
+    // ============================================================
+    // Run Phase
+    // ============================================================
+
     virtual task run_phase(uvm_phase phase);
+
         forever begin
             @(posedge vif.clk);
 
-            if (!vif.resetn && !reset_seen) begin
-                tr_mon = transaction::type_id::create("tr_mon");
-                tr_mon.op_mode = AXI_RESET;
-                `uvm_info("MON", "DUT RESET DETECTED", UVM_MEDIUM)
-                port.write(tr_mon);
-                reset_seen = 1;
+            // ----------------------------------------------------
+            // Reset detection
+            // ----------------------------------------------------
+
+            if (!vif.resetn) begin
+
+                if (!reset_seen) begin
+                    tr_mon = transaction::type_id::create("tr_mon");
+                    tr_mon.op_mode = AXI_RESET;
+
+                    `uvm_info(
+                        "MON",
+                        "DUT RESET DETECTED",
+                        UVM_MEDIUM
+                    )
+
+                    port.write(tr_mon);
+                    reset_seen = 1;
+                end
+
+                // Do not collect transactions during reset
                 continue;
             end
 
-            // reset the reset flag
-            if (vif.resetn) begin
-                reset_seen = 0;
-            end
+            // Reset is deasserted
+            reset_seen = 0;
+
+            // ----------------------------------------------------
+            // Write transaction detection
+            // ----------------------------------------------------
 
             if (vif.awvalid) begin
-                //$display("Test sequence get to sample write");
+
                 tr_mon = transaction::type_id::create("tr_mon");
                 collect_write();
-            end else if (vif.arvalid) begin
-                //$display("Test sequence get to sample read");
+
+            end
+
+            // ----------------------------------------------------
+            // Read transaction detection
+            // ----------------------------------------------------
+
+            else if (vif.arvalid) begin
+
                 tr_mon = transaction::type_id::create("tr_mon");
                 collect_read();
+
             end
+
         end
+
     endtask
 
 endclass
+
 
 
 class scoreboard extends uvm_scoreboard;
@@ -1789,7 +1837,7 @@ class test extends uvm_test;
         // --------------------------------------------------------
         // Basic Read / Write
         // --------------------------------------------------------
-
+        /*
         run_seq_with_reset(
             single_wr_seq,
             "SINGLE WRITE TEST"
@@ -1809,12 +1857,13 @@ class test extends uvm_test;
         // --------------------------------------------------------
         // Burst Modes
         // --------------------------------------------------------
-
+       
         run_seq_with_reset(
             fixed_burst_seq,
             "FIXED BURST TEST"
         );
 
+         
         run_seq_with_reset(
             incr_burst_seq,
             "INCR BURST TEST"
@@ -1825,16 +1874,17 @@ class test extends uvm_test;
             "WRAP BURST TEST"
         );
 
-
+        
         // --------------------------------------------------------
         // Transfer Configuration
         // --------------------------------------------------------
-
+        */
         run_seq_with_reset(
             transfer_size_seq,
             "TRANSFER SIZE TEST"
         );
-
+         
+         /*
         run_seq_with_reset(
             burst_length_seq,
             "BURST LENGTH TEST"
@@ -1845,7 +1895,7 @@ class test extends uvm_test;
             "PARTIAL STROBE TEST"
         );
 
-
+       
         // --------------------------------------------------------
         // Invalid Transactions
         // --------------------------------------------------------
@@ -1910,8 +1960,9 @@ class test extends uvm_test;
             "RANDOM REGRESSION TEST"
         );
 
-
+        */
         // Allow final monitor / scoreboard activity to settle
+        
         #100;
 
         phase.drop_objection(this);

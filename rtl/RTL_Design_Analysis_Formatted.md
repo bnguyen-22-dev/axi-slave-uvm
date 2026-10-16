@@ -30,13 +30,13 @@ be interpreted as a fully compliant or production-ready AXI4 slave. The
 behavior documented here describes the implemented RTL and serves as the
 reference specification for the UVM testbench.
 
-------------------------------------------------------------------------
+---
 
 ## 2. Top-Level Interface
 
 The DUT is implemented by:
 
-``` systemverilog
+```systemverilog
 module axi_mem_slave(...);
 ```
 
@@ -44,139 +44,64 @@ and operates using `clk` and active-low `resetn`.
 
 ### 2.1 Write Address Channel
 
-  ------------------------------------------------------------------------
-  Signal           Direction                        Width DUT Usage
-  ---------------- ---------------- --------------------- ----------------
-  `awvalid`        Input                                1 Indicates a
-                                                          write-address
-                                                          request
-
-  `awid`           Input                                4 Transaction ID
-
-  `awlen`          Input                                4 Burst length;
-                                                          DUT interprets
-                                                          transfer count
-                                                          as `awlen + 1`
-
-  `awsize`         Input                                3 Transfer size: 0
-                                                          = 1 byte, 1 = 2
-                                                          bytes, 2 = 4
-                                                          bytes
-
-  `awaddr`         Input                               32 Starting write
-                                                          address
-
-  `awburst`        Input                                2 Selects FIXED,
-                                                          INCR, or WRAP
-                                                          behavior
-
-  `awready`        Output                               1 Indicates the
-                                                          write-address
-                                                          FSM has reached
-                                                          its ready state
-  ------------------------------------------------------------------------
+| Signal | Direction | Width | DUT Usage |
+|---|---|---:|---|
+| `awvalid` | Input | 1 | Indicates a write-address request |
+| `awid` | Input | 4 | Transaction ID |
+| `awlen` | Input | 4 | Burst length; DUT interprets transfer count as `awlen + 1` |
+| `awsize` | Input | 3 | Transfer size: 0 = 1 byte, 1 = 2 bytes, 2 = 4 bytes |
+| `awaddr` | Input | 32 | Starting write address |
+| `awburst` | Input | 2 | Selects FIXED, INCR, or WRAP behavior |
+| `awready` | Output | 1 | Indicates the write-address FSM has reached its ready state |
 
 ### 2.2 Write Data Channel
 
-  ------------------------------------------------------------------------
-  Signal           Direction                        Width DUT Usage
-  ---------------- ---------------- --------------------- ----------------
-  `wvalid`         Input                                1 Indicates valid
-                                                          write data
-
-  `wid`            Input                                4 Write-data
-                                                          transaction ID;
-                                                          not used for
-                                                          internal
-                                                          processing
-
-  `wdata`          Input                               32 Write-data value
-
-  `wstrb`          Input                                4 Selects active
-                                                          byte lanes
-
-  `wlast`          Input                                1 Indicates
-                                                          completion of
-                                                          the write burst
-                                                          to the
-                                                          write/response
-                                                          control logic
-
-  `wready`         Output                               1 Pulses as the W
-                                                          FSM processes
-                                                          write beats
-  ------------------------------------------------------------------------
+| Signal | Direction | Width | DUT Usage |
+|---|---|---:|---|
+| `wvalid` | Input | 1 | Indicates valid write data |
+| `wid` | Input | 4 | Write-data transaction ID; not used for internal processing |
+| `wdata` | Input | 32 | Write-data value |
+| `wstrb` | Input | 4 | Selects active byte lanes |
+| `wlast` | Input | 1 | Indicates completion of the write burst to the write/response control logic |
+| `wready` | Output | 1 | Pulses as the W FSM processes write beats |
 
 ### 2.3 Write Response Channel
 
-  ------------------------------------------------------------------------
-  Signal           Direction                        Width DUT Usage
-  ---------------- ---------------- --------------------- ----------------
-  `bready`         Input                                1 Indicates the
-                                                          requester is
-                                                          ready for the
-                                                          response
-
-  `bvalid`         Output                               1 Indicates a
-                                                          valid write
-                                                          response
-
-  `bid`            Output                               4 Response
-                                                          transaction ID
-
-  `bresp`          Output                               2 Write response
-                                                          status
-  ------------------------------------------------------------------------
+| Signal | Direction | Width | DUT Usage |
+|---|---|---:|---|
+| `bready` | Input | 1 | Indicates the requester is ready for the response |
+| `bvalid` | Output | 1 | Indicates a valid write response |
+| `bid` | Output | 4 | Response transaction ID |
+| `bresp` | Output | 2 | Write response status |
 
 ### 2.4 Read Address Channel
 
-  ------------------------------------------------------------------------
-  Signal           Direction                        Width DUT Usage
-  ---------------- ---------------- --------------------- ----------------
-  `arvalid`        Input                                1 Indicates a
-                                                          read-address
-                                                          request
-
-  `arid`           Input                                4 Read transaction
-                                                          ID
-
-  `arlen`          Input                                4 Burst length
-
-  `arsize`         Input                                3 Transfer size: 0
-                                                          = 1 byte, 1 = 2
-                                                          bytes, 2 = 4
-                                                          bytes
-
-  `araddr`         Input                               32 Starting read
-                                                          address
-
-  `arburst`        Input                                2 Selects FIXED,
-                                                          INCR, or WRAP
-                                                          behavior
-
-  `arready`        Output                               1 Indicates the
-                                                          read-address FSM
-                                                          ready state
-  ------------------------------------------------------------------------
+| Signal | Direction | Width | DUT Usage |
+|---|---|---:|---|
+| `arvalid` | Input | 1 | Indicates a read-address request |
+| `arid` | Input | 4 | Read transaction ID |
+| `arlen` | Input | 4 | Burst length |
+| `arsize` | Input | 3 | Transfer size: 0 = 1 byte, 1 = 2 bytes, 2 = 4 bytes |
+| `araddr` | Input | 32 | Starting read address |
+| `arburst` | Input | 2 | Selects FIXED, INCR, or WRAP behavior |
+| `arready` | Output | 1 | Indicates the read-address FSM ready state |
 
 ### 2.5 Read Data/Response Channel
 
-  Signal     Direction     Width DUT Usage
-  ---------- ----------- ------- -------------------------------------
-  `rvalid`   Output            1 Indicates valid returned read data
-  `rid`      Output            4 Read transaction ID
-  `rdata`    Output           32 Returned data
-  `rlast`    Output            1 Indicates the end of the read burst
-  `rready`   Input             1 Indicates requester readiness
-  `rresp`    Output            2 Read response status
-
-------------------------------------------------------------------------
+| Signal | Direction | Width | DUT Usage |
+|---|---|---:|---|
+| `rvalid` | Output | 1 | Indicates valid returned read data |
+| `rid` | Output | 4 | Read transaction ID |
+| `rdata` | Output | 32 | Returned data |
+| `rlast` | Output | 1 | Indicates the end of the read burst |
+| `rready` | Input | 1 | Indicates requester readiness |
+| `rresp` | Output | 2 | Read response status |
 
 ## 3. Internal Architecture
 
 The DUT uses **five FSMs**:
 
-``` text
+```text
                    axi_mem_slave
 
         WRITE PATH                    READ PATH
@@ -198,7 +123,7 @@ The DUT uses **five FSMs**:
 
 The FSMs are:
 
-``` text
+```text
 AW FSM : awidle → awstart → awreadys
 
 W FSM  : widle → wstart → waddr_dec → wreadys → wvalids
@@ -215,25 +140,25 @@ R FSM  : ridle → rstart → rwait → rvalids
 The design is organized primarily around **channel-specific state
 machines rather than one centralized transaction controller**.
 
-------------------------------------------------------------------------
+---
 
 ## 4. Internal Memory Organization
 
 The memory is declared as:
 
-``` systemverilog
+```systemverilog
 reg [7:0] mem[128] = '{default:0};
 ```
 
 Therefore the DUT contains:
 
-``` text
+```text
 128 entries × 8 bits = 128 bytes
 ```
 
 Each memory location represents one byte:
 
-``` text
+```text
 mem[0]    → byte 0
 mem[1]    → byte 1
 ...
@@ -247,20 +172,20 @@ configuration and `WSTRB`.
 For a full write strobe (`WSTRB = 4'b1111`), the write helper functions
 map the data as:
 
-``` systemverilog
+```systemverilog
 mem[address]     = wdata_temp[7:0];
 mem[address + 1] = wdata_temp[15:8];
 mem[address + 2] = wdata_temp[23:16];
 mem[address + 3] = wdata_temp[31:24];
 ```
 
-------------------------------------------------------------------------
+---
 
 # 5. Write Path Architecture and Operation
 
 The write path is controlled by three cooperating FSMs:
 
-``` text
+```text
 Write Address Channel     Write Data Channel       Write Response Channel
 
       AW FSM                    W FSM                      B FSM
@@ -276,7 +201,7 @@ state of the W FSM, while the B FSM observes `WLAST`.
 
 A write operation can be viewed as:
 
-``` text
+```text
 1. Detect write request
         ↓
 2. Process AW information
@@ -294,12 +219,29 @@ A write operation can be viewed as:
 
 The write-address FSM contains three states:
 
-``` systemverilog
+```systemverilog
 awidle
 awstart
 awreadys
 ```
 
+Its progression is:
+
+```text
+                 AWVALID = 0
+                    ┌───────┐
+                    │       │
+                    ▼       │
+awidle ───────► awstart ────┘
+                  │
+                  │ AWVALID = 1
+                  ▼
+              awreadys
+                  │
+                  │ W FSM reaches wreadys
+                  ▼
+                awidle
+```
 
 ### `awidle`
 
@@ -316,11 +258,17 @@ The DUT asserts `awready` and remains in this state until the W FSM
 reaches `wreadys`. The AW FSM is therefore explicitly coupled to the W
 FSM.
 
-------------------------------------------------------------------------
+---
 
 ## 5.2 Write Data FSM
 
 The W FSM contains five states:
+
+```text
+widle → wstart → waddr_dec → wreadys → wvalids
+          ▲                              │
+          └──────────────────────────────┘
+```
 
 ### `widle`
 
@@ -344,7 +292,7 @@ This state selects the address used for the current write.
 
 For the first beat:
 
-``` text
+```text
 next_addr = awaddr
 first     = 1
 ```
@@ -362,7 +310,7 @@ For a normal write beat, this state:
 
 Burst selection is:
 
-``` text
+```text
 AWBURST = 00 → data_wr_fixed()
 AWBURST = 01 → data_wr_incr()
 AWBURST = 10 → data_wr_wrap()
@@ -385,13 +333,13 @@ This state:
 The resulting behavior produces repeated `wready` pulses as beats are
 processed.
 
-------------------------------------------------------------------------
+---
 
 ## 5.3 Write Response FSM
 
 The B FSM contains:
 
-``` text
+```text
 bidle → bdetect_last → bstart → bwait
 ```
 
@@ -414,22 +362,22 @@ The DUT:
 
 The implemented response behavior is:
 
-  Condition                         `BRESP` DUT Meaning
-  ------------------------------- --------- ----------------------
-  `awaddr < 128 && awsize <= 2`        `00` OKAY
-  `awsize > 2`                         `10` SLVERR
-  Otherwise                            `11` Address/decode error
+| Condition | `BRESP` | DUT Meaning |
+|---|---|---|
+| `awaddr < 128 && awsize <= 2` | `00` | OKAY |
+| `awsize > 2` | `10` | SLVERR |
+| Otherwise | `11` | Address/decode error |
 
 ### `bwait`
 
 The FSM waits for `bready`. When `bready` is observed, it returns to
 `bidle`.
 
-------------------------------------------------------------------------
+---
 
 ## 5.4 Complete Write Transaction Flow
 
-``` text
+```text
 AWVALID / AW information
 WVALID  / first WDATA
           │
@@ -474,7 +422,7 @@ WLAST = 1
                   bidle
 ```
 
-------------------------------------------------------------------------
+---
 
 # 6. Write Burst Behavior
 
@@ -485,7 +433,7 @@ WLAST = 1
 
 Conceptually:
 
-``` text
+```text
 current address
       │
       ├── write selected bytes
@@ -501,7 +449,7 @@ case.
 
 Examples:
 
-``` text
+```text
 WSTRB = 0001 → +1
 WSTRB = 0011 → +2
 WSTRB = 0111 → +3
@@ -517,7 +465,7 @@ For WRAP writes, the DUT computes a boundary from `AWLEN` and `AWSIZE`.
 
 Supported `AWLEN` values in `wrap_boundary()` are:
 
-``` text
+```text
 1  → 2 beats
 3  → 4 beats
 7  → 8 beats
@@ -526,7 +474,7 @@ Supported `AWLEN` values in `wrap_boundary()` are:
 
 The boundary is calculated as:
 
-``` text
+```text
 boundary = (AWLEN + 1) × bytes_per_transfer
 ```
 
@@ -534,15 +482,28 @@ The `data_wr_wrap()` helper writes each selected byte and wraps an
 address back by the boundary when advancing to the next byte would reach
 a boundary multiple.
 
-------------------------------------------------------------------------
+---
 
 # 7. Read Path Architecture and Operation
 
 The read path is controlled by the AR FSM and R FSM:
 
+```text
+AR channel
+    │
+    ▼
+  AR FSM
+    │
+    ▼
+  R FSM ◄──────── Internal Memory
+    │
+    ▼
+RDATA / RRESP / RVALID / RLAST
+```
+
 A read operation can be viewed as:
 
-``` text
+```text
 1. Detect ARVALID
         ↓
 2. Capture read address
@@ -564,7 +525,7 @@ A read operation can be viewed as:
 
 The AR FSM contains:
 
-``` text
+```text
 aridle → arstart → arreadys → aridle
 ```
 
@@ -578,7 +539,7 @@ The FSM waits for `arvalid`.
 
 When `arvalid` is observed:
 
-``` text
+```text
 araddrt = araddr
 next state = arreadys
 ```
@@ -589,7 +550,7 @@ If `arvalid` is low, the FSM remains in `arstart`.
 
 The DUT:
 
-``` text
+```text
 ARREADY = 1
 ```
 
@@ -598,13 +559,13 @@ and immediately schedules a return to `aridle`.
 Therefore, `arready` is asserted for the AR FSM's ready state after
 `arvalid` has been detected.
 
-------------------------------------------------------------------------
+---
 
 ## 7.2 Read Data/Response FSM
 
 The R FSM contains five states:
 
-``` text
+```text
 ridle
 rstart
 rwait
@@ -614,7 +575,7 @@ rerror
 
 The normal successful-read path is:
 
-``` text
+```text
 ridle
   │ ARVALID
   ▼
@@ -633,13 +594,13 @@ rvalids
 
 Invalid address or unsupported transfer size uses `rerror`.
 
-------------------------------------------------------------------------
+---
 
 ## 7.3 `ridle` --- Read Initialization
 
 In `ridle`, the DUT clears the read-side outputs and tracking variables:
 
-``` text
+```text
 RID       = 0
 RDFIRST   = 0
 RDATA     = 0
@@ -652,13 +613,13 @@ LEN_COUNT = 0
 If `arvalid` is high, the R FSM moves to `rstart`. Otherwise it remains
 in `ridle`.
 
-------------------------------------------------------------------------
+---
 
 ## 7.4 `rstart` --- Generate Read Data and Response
 
 For a valid request:
 
-``` text
+```text
 araddrt < 128
 AND
 arsize <= 2
@@ -674,7 +635,7 @@ the DUT:
 
 Burst selection is:
 
-``` text
+```text
 ARBURST = 00 → read_data_fixed()
 ARBURST = 01 → read_data_incr()
 ARBURST = 10 → read_data_wrap()
@@ -687,7 +648,7 @@ determine the address for successive beats.
 
 If:
 
-``` text
+```text
 araddr >= 128
 AND
 arsize <= 2
@@ -695,7 +656,7 @@ arsize <= 2
 
 the DUT produces:
 
-``` text
+```text
 RRESP  = 11
 RVALID = 1
 ```
@@ -704,26 +665,26 @@ and enters `rerror`.
 
 If:
 
-``` text
+```text
 arsize > 2
 ```
 
 the DUT produces:
 
-``` text
+```text
 RRESP  = 10
 RVALID = 1
 ```
 
 and enters `rerror`.
 
-------------------------------------------------------------------------
+---
 
 ## 7.5 `rwait` --- Wait for RREADY
 
 In `rwait`:
 
-``` text
+```text
 RVALID = 0
 ```
 
@@ -731,7 +692,7 @@ The FSM waits for `rready`.
 
 If:
 
-``` text
+```text
 RREADY = 1
 ```
 
@@ -742,32 +703,32 @@ Otherwise, it remains in `rwait`.
 This behavior is part of the implemented educational DUT and is the
 behavior the UVM environment should observe and verify.
 
-------------------------------------------------------------------------
+---
 
 ## 7.6 `rvalids` --- Advance the Read Burst
 
 In `rvalids`, the DUT increments:
 
-``` text
+```text
 len_count = len_count + 1
 ```
 
 It then compares the count with:
 
-``` text
+```text
 arlen + 1
 ```
 
 If the configured number of transfers has been reached:
 
-``` text
+```text
 RLAST = 1
 next state = ridle
 ```
 
 Otherwise:
 
-``` text
+```text
 RLAST = 0
 next state = rstart
 ```
@@ -775,7 +736,7 @@ next state = rstart
 This causes the R FSM to return to `rstart` and generate the next read
 beat.
 
-------------------------------------------------------------------------
+---
 
 ## 7.7 `rerror` --- Error-Response Handling
 
@@ -787,7 +748,7 @@ The state deasserts `rvalid` and uses `len_count`, `arlen`, and
 
 When the error sequence reaches its final transfer, the DUT:
 
-``` text
+```text
 RLAST = 1
 next state = ridle
 len_count = 0
@@ -796,7 +757,7 @@ len_count = 0
 This error behavior should be treated as part of the DUT-specific
 reference behavior when constructing error tests.
 
-------------------------------------------------------------------------
+---
 
 # 8. Read Burst Behavior
 
@@ -807,7 +768,7 @@ it.
 
 The number of bytes returned depends on `ARSIZE`:
 
-``` text
+```text
 ARSIZE = 0 → 1 byte
 ARSIZE = 1 → 2 bytes
 ARSIZE = 2 → 4 bytes
@@ -815,7 +776,7 @@ ARSIZE = 2 → 4 bytes
 
 For a four-byte read:
 
-``` text
+```text
 RDATA[7:0]   = mem[address]
 RDATA[15:8]  = mem[address + 1]
 RDATA[23:16] = mem[address + 2]
@@ -827,7 +788,7 @@ RDATA[31:24] = mem[address + 3]
 `read_data_incr()` reads the configured number of bytes and returns the
 next address:
 
-``` text
+```text
 ARSIZE = 0 → next address = address + 1
 ARSIZE = 1 → next address = address + 2
 ARSIZE = 2 → next address = address + 4
@@ -844,42 +805,42 @@ checking the wrap boundary after each byte.
 The boundary is produced by the same `wrap_boundary()` helper used by
 the write path:
 
-``` text
+```text
 boundary = (ARLEN + 1) × bytes_per_transfer
 ```
 
 When incrementing an address reaches a boundary multiple, the helper
 subtracts the boundary to obtain the wrapped address.
 
-------------------------------------------------------------------------
+---
 
 # 9. Response and Error Behavior Summary
 
 ## 9.1 Write Response
 
-  Condition                                                  `BRESP`
-  -------------------------------------------------------- ---------
-  Address `< 128` and `AWSIZE <= 2`                             `00`
-  `AWSIZE > 2`                                                  `10`
-  Address outside implemented memory with supported size        `11`
+| Condition | `BRESP` |
+|---|---|
+| Address `< 128` and `AWSIZE <= 2` | `00` |
+| `AWSIZE > 2` | `10` |
+| Address outside implemented memory with supported size | `11` |
 
 ## 9.2 Read Response
 
-  Condition                                                  `RRESP`
-  -------------------------------------------------------- ---------
-  Address `< 128` and `ARSIZE <= 2`                             `00`
-  `ARSIZE > 2`                                                  `10`
-  Address outside implemented memory with supported size        `11`
+| Condition | `RRESP` |
+|---|---|
+| Address `< 128` and `ARSIZE <= 2` | `00` |
+| `ARSIZE > 2` | `10` |
+| Address outside implemented memory with supported size | `11` |
 
 For this project these values are interpreted as:
 
-``` text
+```text
 00 → OKAY
 10 → SLVERR
 11 → address/decode error
 ```
 
-------------------------------------------------------------------------
+---
 
 # 10. DUT-Specific Behavioral Summary
 
@@ -916,7 +877,7 @@ This section is the behavioral contract that should be used when
 reviewing the UVM driver, monitors, scoreboard, sequences, assertions,
 and functional coverage.
 
-------------------------------------------------------------------------
+---
 
 # 11. Known Design Limitations
 
@@ -980,7 +941,7 @@ Signals such as `WREADY`, `RVALID`, and `RLAST` are generated according
 to the internal multi-state sequencing described in this document. The
 timing is therefore specific to this educational FSM implementation.
 
-------------------------------------------------------------------------
+---
 
 # 12. Future Work --- AXI Slave Version 2
 
@@ -1013,7 +974,7 @@ These improvements are intentionally deferred. The current project's
 primary objective is to build and demonstrate a structured **UVM
 verification environment** around the documented DUT.
 
-------------------------------------------------------------------------
+---
 
 # 13. Verification Contract
 
