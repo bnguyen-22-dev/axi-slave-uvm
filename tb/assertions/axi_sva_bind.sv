@@ -1,36 +1,21 @@
-// Compile once with axi_sva.sv and the existing RTL/testbench sources.
-// Module-type binding attaches one passive checker to each axi_mem_slave.
-bind axi_mem_slave axi_sva u_axi_sva (
-    .clk     (clk),
-    .resetn  (resetn),
-    .awvalid (awvalid),
-    .awready (awready),
-    .awid    (awid),
-    .awlen   (awlen),
-    .awsize  (awsize),
-    .awaddr  (awaddr),
-    .awburst (awburst),
-    .wvalid  (wvalid),
-    .wready  (wready),
-    .wid     (wid),
-    .wdata   (wdata),
-    .wstrb   (wstrb),
-    .wlast   (wlast),
-    .bvalid  (bvalid),
-    .bready  (bready),
-    .bid     (bid),
-    .bresp   (bresp),
-    .arvalid (arvalid),
-    .arready (arready),
-    .arid    (arid),
-    .arlen   (arlen),
-    .arsize  (arsize),
-    .araddr  (araddr),
-    .arburst (arburst),
-    .rvalid  (rvalid),
-    .rready  (rready),
-    .rid     (rid),
-    .rdata   (rdata),
-    .rresp   (rresp),
-    .rlast   (rlast)
+bind axi_mem_slave axi_sva axi_sva_inst (
+    .clk      (clk),
+    .resetn   (resetn),
+
+    .awvalid  (awvalid),
+    .awready  (awready),
+    .awaddr   (awaddr),
+    .awsize   (awsize),
+
+    .wvalid   (wvalid),
+    .wready   (wready),
+
+    .bvalid   (bvalid),
+    .bresp    (bresp),
+
+    .arvalid  (arvalid),
+    .rvalid   (rvalid),
+
+    .awstate  (awstate),
+    .wstate   (wstate)
 );
